@@ -82,7 +82,7 @@ func TestExif(t *testing.T) {
 		assert.Equal(t, "2017-12-21T05:17:28Z", data.TakenAtLocal.Format("2006-01-02T15:04:05Z"))
 		assert.Equal(t, "", data.Title)
 		assert.Equal(t, "", data.Keywords)
-		assert.Equal(t, "DCIM\\100GOPRO", data.Description)
+		assert.Equal(t, "", data.Description)
 		assert.Equal(t, "", data.Copyright)
 		assert.Equal(t, 180, data.Height)
 		assert.Equal(t, 240, data.Width)
@@ -104,7 +104,7 @@ func TestExif(t *testing.T) {
 			t.Fatal("err should NOT be nil")
 		}
 
-		assert.Equal(t, "no exif data in tweethog.png", err.Error())
+		assert.Equal(t, "metadata: no exif header in tweethog.png (parse png)", err.Error())
 	})
 
 	t.Run("iphone_7.heic", func(t *testing.T) {
@@ -142,8 +142,8 @@ func TestExif(t *testing.T) {
 		assert.True(t, data.TakenAtLocal.IsZero())
 		assert.Equal(t, "", data.Description)
 		assert.Equal(t, "", data.Copyright)
-		assert.Equal(t, 0, data.Height) // TODO
-		assert.Equal(t, 0, data.Width)  // TODO
+		assert.Equal(t, 3272, data.Height)
+		assert.Equal(t, 4940, data.Width)
 		assert.Equal(t, float32(-38.405193), data.Lat)
 		assert.Equal(t, float32(144.18896), data.Lng)
 		assert.Equal(t, 0, data.Altitude)
@@ -219,7 +219,7 @@ func TestExif(t *testing.T) {
 			t.Fatal("err should NOT be nil")
 		}
 
-		assert.Equal(t, "no exif data in no-exif-data.jpg", err.Error())
+		assert.Equal(t, "metadata: no exif header in no-exif-data.jpg (search and extract)", err.Error())
 	})
 
 	t.Run("screenshot.png", func(t *testing.T) {
@@ -255,7 +255,7 @@ func TestExif(t *testing.T) {
 		assert.Equal(t, 1, data.Orientation)
 
 		if err := data.JSON("testdata/orientation.json", "foo.jpg"); err != nil {
-			assert.EqualError(t, err, "meta: original name foo.jpg does not match orientation.jpg (json)")
+			assert.EqualError(t, err, "metadata: original name foo.jpg does not match orientation.jpg (exiftool)")
 		} else {
 			t.Error("error expected when providing wrong orginal name")
 		}
@@ -264,6 +264,58 @@ func TestExif(t *testing.T) {
 	t.Run("gopher-preview.jpg", func(t *testing.T) {
 		_, err := Exif("testdata/gopher-preview.jpg")
 
-		assert.EqualError(t, err, "no exif data in gopher-preview.jpg")
+		assert.EqualError(t, err, "metadata: no exif header in gopher-preview.jpg (search and extract)")
+	})
+
+	t.Run("huawei-gps-error.jpg", func(t *testing.T) {
+		data, err := Exif("testdata/huawei-gps-error.jpg")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, "2020-06-16T16:52:46Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
+		assert.Equal(t, "2020-06-16T18:52:46Z", data.TakenAtLocal.Format("2006-01-02T15:04:05Z"))
+		assert.Equal(t, float32(48.302776), data.Lat)
+		assert.Equal(t, float32(8.9275), data.Lng)
+		assert.Equal(t, 0, data.Altitude)
+		assert.Equal(t, "1/110", data.Exposure)
+		assert.Equal(t, "HUAWEI", data.CameraMake)
+		assert.Equal(t, "ELE-L29", data.CameraModel)
+		assert.Equal(t, 27, data.FocalLength)
+		assert.Equal(t, 0, data.Orientation)
+		assert.Equal(t, "", data.LensMake)
+		assert.Equal(t, "", data.LensModel)
+	})
+
+	t.Run("panorama360.jpg", func(t *testing.T) {
+		data, err := Exif("testdata/panorama360.jpg")
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// t.Logf("all: %+v", data.All)
+
+		assert.Equal(t, "", data.Artist)
+		assert.Equal(t, "2020-05-24T08:55:21Z", data.TakenAt.Format("2006-01-02T15:04:05Z"))
+		assert.Equal(t, "2020-05-24T11:55:21Z", data.TakenAtLocal.Format("2006-01-02T15:04:05Z"))
+		assert.Equal(t, "", data.Title)
+		assert.Equal(t, "", data.Keywords)
+		assert.Equal(t, "", data.Description)
+		assert.Equal(t, "", data.Copyright)
+		assert.Equal(t, 3600, data.Height)
+		assert.Equal(t, 7200, data.Width)
+		assert.Equal(t, float32(59.84083), data.Lat)
+		assert.Equal(t, float32(30.51), data.Lng)
+		assert.Equal(t, 0, data.Altitude)
+		assert.Equal(t, "1/1250", data.Exposure)
+		assert.Equal(t, "SAMSUNG", data.CameraMake)
+		assert.Equal(t, "SM-C200", data.CameraModel)
+		assert.Equal(t, "", data.CameraOwner)
+		assert.Equal(t, "", data.CameraSerial)
+		assert.Equal(t, 6, data.FocalLength)
+		assert.Equal(t, 0, int(data.Orientation))
+		assert.Equal(t, "", data.Projection)
 	})
 }

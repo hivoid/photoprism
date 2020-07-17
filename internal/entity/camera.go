@@ -37,6 +37,16 @@ var CameraMakes = map[string]string{
 }
 
 var CameraModels = map[string]string{
+	"EML-AL00":   "P20",
+	"EML-L09":    "P20",
+	"EML-L09C":   "P20",
+	"EML-L29":    "P20",
+	"EML-L29C":   "P20",
+	"CLT-AL00":   "P20 Pro",
+	"CLT-AL01":   "P20 Pro",
+	"CLT-TL01":   "P20 Pro",
+	"CLT-L09":    "P20 Pro",
+	"CLT-L29":    "P20 Pro",
 	"ELE-L29":    "P30",
 	"ELE-AL00":   "P30",
 	"ELE-L04":    "P30",
@@ -132,23 +142,26 @@ func FirstOrCreateCamera(m *Camera) *Camera {
 
 	if err := Db().Where("camera_model = ? AND camera_make = ?", m.CameraModel, m.CameraMake).First(&result).Error; err == nil {
 		return &result
-	} else if err := m.Create(); err != nil {
-		log.Errorf("camera: %s", err)
-		return nil
+	} else if createErr := m.Create(); createErr == nil {
+		if !m.Unknown() {
+			event.EntitiesCreated("cameras", []*Camera{m})
+
+			event.Publish("count.cameras", event.Data{
+				"count": 1,
+			})
+		}
+
+		return m
+	} else if err := Db().Where("camera_model = ? AND camera_make = ?", m.CameraModel, m.CameraMake).First(&result).Error; err == nil {
+		return &result
+	} else {
+		log.Errorf("camera: %s (first or create %s)", createErr, m.String())
 	}
 
-	if !m.Unknown() {
-		event.EntitiesCreated("cameras", []*Camera{m})
-
-		event.Publish("count.cameras", event.Data{
-			"count": 1,
-		})
-	}
-
-	return m
+	return nil
 }
 
-// String returns a string designing the given Camera entity
+// String returns an identifier that can be used in logs.
 func (m *Camera) String() string {
 	return m.CameraName
 }

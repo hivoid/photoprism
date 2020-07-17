@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/photoprism/photoprism/internal/config"
+	"github.com/photoprism/photoprism/internal/acl"
 	"github.com/photoprism/photoprism/internal/query"
 	"github.com/photoprism/photoprism/pkg/txt"
 
@@ -11,10 +11,12 @@ import (
 )
 
 // GET /api/v1/moments/time
-func GetMomentsTime(router *gin.RouterGroup, conf *config.Config) {
+func GetMomentsTime(router *gin.RouterGroup) {
 	router.GET("/moments/time", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+		s := Auth(SessionID(c), acl.ResourceAlbums, acl.ActionExport)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 

@@ -14,13 +14,12 @@ func PhotoByID(photoID uint64) (photo entity.Photo, err error) {
 			return db.Order("photos_labels.uncertainty ASC, photos_labels.label_id DESC")
 		}).
 		Preload("Labels.Label").
-		Preload("Links").
 		Preload("Camera").
 		Preload("Lens").
 		Preload("Details").
 		Preload("Place").
-		Preload("Location").
-		Preload("Location.Place").
+		Preload("Cell").
+		Preload("Cell.Place").
 		First(&photo).Error; err != nil {
 		return photo, err
 	}
@@ -35,13 +34,12 @@ func PhotoByUID(photoUID string) (photo entity.Photo, err error) {
 			return db.Order("photos_labels.uncertainty ASC, photos_labels.label_id DESC")
 		}).
 		Preload("Labels.Label").
-		Preload("Links").
 		Preload("Camera").
 		Preload("Lens").
 		Preload("Details").
 		Preload("Place").
-		Preload("Location").
-		Preload("Location.Place").
+		Preload("Cell").
+		Preload("Cell.Place").
 		First(&photo).Error; err != nil {
 		return photo, err
 	}
@@ -56,13 +54,12 @@ func PhotoPreloadByUID(photoUID string) (photo entity.Photo, err error) {
 			return db.Order("photos_labels.uncertainty ASC, photos_labels.label_id DESC")
 		}).
 		Preload("Labels.Label").
-		Preload("Links").
 		Preload("Camera").
 		Preload("Lens").
 		Preload("Details").
 		Preload("Place").
-		Preload("Location").
-		Preload("Location.Place").
+		Preload("Cell").
+		Preload("Cell.Place").
 		First(&photo).Error; err != nil {
 		return photo, err
 	}
@@ -93,21 +90,20 @@ func ResetPhotoQuality() error {
 		Update("photo_quality", -1).Error
 }
 
-// PhotosMaintenance returns photos selected for maintenance.
-func PhotosMaintenance(limit int, offset int) (entities entity.Photos, err error) {
+// PhotosCheck returns photos selected for maintenance.
+func PhotosCheck(limit int, offset int) (entities entity.Photos, err error) {
 	err = Db().
 		Preload("Labels", func(db *gorm.DB) *gorm.DB {
 			return db.Order("photos_labels.uncertainty ASC, photos_labels.label_id DESC")
 		}).
 		Preload("Labels.Label").
-		Preload("Links").
 		Preload("Camera").
 		Preload("Lens").
 		Preload("Details").
 		Preload("Place").
-		Preload("Location").
-		Preload("Location.Place").
-		Where("maintained_at IS NULL OR maintained_at < ?", time.Now().Add(-1*time.Hour*24*3)).
+		Preload("Cell").
+		Preload("Cell.Place").
+		Where("checked_at IS NULL OR checked_at < ?", time.Now().Add(-1*time.Hour*24*3)).
 		Where("updated_at < ?", time.Now().Add(-1*time.Minute*10)).
 		Limit(limit).Offset(offset).Find(&entities).Error
 

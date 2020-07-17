@@ -83,33 +83,3 @@ func TestTitle(t *testing.T) {
 		assert.Equal(t, "A Horse Is Not a Cow :-)", Title("a horse is not a cow :-)"))
 	})
 }
-
-func TestTitleFromFileName(t *testing.T) {
-	t.Run("photoprism", func(t *testing.T) {
-		assert.Equal(t, "PhotoPrism: Browse Your Life in Pictures", TitleFromFileName("photoprism: Browse your life in pictures"))
-	})
-	t.Run("dash", func(t *testing.T) {
-		assert.Equal(t, "Photo Lover", TitleFromFileName("photo-lover"))
-	})
-	t.Run("nyc", func(t *testing.T) {
-		assert.Equal(t, "Bridge in, or by, NYC", TitleFromFileName("BRIDGE in, or by, nyc"))
-	})
-	t.Run("apple", func(t *testing.T) {
-		assert.Equal(t, "Phil Unveils iPhone, iPad, iPod, 'airpods', Airpod, AirPlay, iMac or MacBook", TitleFromFileName("phil unveils iphone, ipad, ipod, 'airpods', airpod, airplay, imac or macbook 11 pro and max"))
-	})
-	t.Run("IMG_4568", func(t *testing.T) {
-		assert.Equal(t, "", TitleFromFileName("IMG_4568"))
-	})
-	t.Run("queen-city-yacht-club--toronto-island_7999432607_o.jpg", func(t *testing.T) {
-		assert.Equal(t, "Queen City Yacht Club / Toronto Island", TitleFromFileName("queen-city-yacht-club--toronto-island_7999432607_o.jpg"))
-	})
-	t.Run("tim-robbins--tiff-2012_7999233420_o.jpg", func(t *testing.T) {
-		assert.Equal(t, "Tim Robbins / TIFF", TitleFromFileName("tim-robbins--tiff-2012_7999233420_o.jpg"))
-	})
-	t.Run("20200102-204030-Berlin-Germany-2020-3h4.jpg", func(t *testing.T) {
-		assert.Equal(t, "Berlin Germany", TitleFromFileName("20200102-204030-Berlin-Germany-2020-3h4.jpg"))
-	})
-	t.Run("changing-of-the-guard--buckingham-palace_7925318070_o.jpg", func(t *testing.T) {
-		assert.Equal(t, "Changing of the Guard / Buckingham Palace", TitleFromFileName("changing-of-the-guard--buckingham-palace_7925318070_o.jpg"))
-	})
-}

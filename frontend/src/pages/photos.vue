@@ -1,40 +1,40 @@
 <template>
-    <div class="p-page p-page-photos" v-infinite-scroll="loadMore" :infinite-scroll-disabled="scrollDisabled"
-         :infinite-scroll-distance="10" :infinite-scroll-listen-for-event="'scrollRefresh'">
+  <div class="p-page p-page-photos" v-infinite-scroll="loadMore" :infinite-scroll-disabled="scrollDisabled"
+       :infinite-scroll-distance="10" :infinite-scroll-listen-for-event="'scrollRefresh'">
 
-        <p-photo-toolbar :settings="settings" :filter="filter" :filter-change="updateQuery" :dirty="dirty"
-                         :refresh="refresh"></p-photo-toolbar>
+    <p-photo-toolbar :settings="settings" :filter="filter" :filter-change="updateQuery" :dirty="dirty"
+                     :refresh="refresh"></p-photo-toolbar>
 
-        <v-container fluid class="pa-4" v-if="loading">
-            <v-progress-linear color="secondary-dark" :indeterminate="true"></v-progress-linear>
-        </v-container>
-        <v-container fluid class="pa-0" v-else>
-            <p-scroll-top></p-scroll-top>
+    <v-container fluid class="pa-4" v-if="loading">
+      <v-progress-linear color="secondary-dark" :indeterminate="true"></v-progress-linear>
+    </v-container>
+    <v-container fluid class="pa-0" v-else>
+      <p-scroll-top></p-scroll-top>
 
-            <p-photo-clipboard :refresh="refresh" :selection="selection" :context="context"></p-photo-clipboard>
+      <p-photo-clipboard :refresh="refresh" :selection="selection" :context="context"></p-photo-clipboard>
 
-            <p-photo-mosaic v-if="settings.view === 'mosaic'"
-                            :photos="results"
-                            :selection="selection"
-                            :filter="filter"
-                            :edit-photo="editPhoto"
-                            :open-photo="openPhoto"></p-photo-mosaic>
-            <p-photo-list v-else-if="settings.view === 'list'"
-                          :photos="results"
-                          :selection="selection"
-                          :filter="filter"
-                          :open-photo="openPhoto"
-                          :edit-photo="editPhoto"
-                          :open-location="openLocation"></p-photo-list>
-            <p-photo-cards v-else
-                           :photos="results"
-                           :selection="selection"
-                           :filter="filter"
-                           :open-photo="openPhoto"
-                           :edit-photo="editPhoto"
-                           :open-location="openLocation"></p-photo-cards>
-        </v-container>
-    </div>
+      <p-photo-mosaic v-if="settings.view === 'mosaic'"
+                      :photos="results"
+                      :selection="selection"
+                      :filter="filter"
+                      :edit-photo="editPhoto"
+                      :open-photo="openPhoto"></p-photo-mosaic>
+      <p-photo-list v-else-if="settings.view === 'list'"
+                    :photos="results"
+                    :selection="selection"
+                    :filter="filter"
+                    :open-photo="openPhoto"
+                    :edit-photo="editPhoto"
+                    :open-location="openLocation"></p-photo-list>
+      <p-photo-cards v-else
+                     :photos="results"
+                     :selection="selection"
+                     :filter="filter"
+                     :open-photo="openPhoto"
+                     :edit-photo="editPhoto"
+                     :open-location="openLocation"></p-photo-cards>
+    </v-container>
+  </div>
 </template>
 
 <script>
@@ -105,6 +105,7 @@
                 subscriptions: [],
                 listen: false,
                 dirty: false,
+                complete: false,
                 results: [],
                 scrollDisabled: true,
                 pageSize: 60,
@@ -116,6 +117,10 @@
                 lastFilter: {},
                 routeName: routeName,
                 loading: true,
+                viewer: {
+                    results: [],
+                    loading: false,
+                },
             };
         },
         computed: {
@@ -165,8 +170,8 @@
             openLocation(index) {
                 const photo = this.results[index];
 
-                if (photo.LocationID && photo.LocationID !== "zz") {
-                    this.$router.push({name: "place", params: {q: photo.LocationID}});
+                if (photo.CellID && photo.CellID !== "zz") {
+                    this.$router.push({name: "place", params: {q: photo.CellID}});
                 } else if (photo.PlaceID && photo.PlaceID !== "zz") {
                     this.$router.push({name: "place", params: {q: photo.PlaceID}});
                 } else if (photo.Country && photo.Country !== "zz") {
@@ -184,21 +189,69 @@
                 Event.publish("dialog.edit", {selection: selection, album: null, index: index});
             },
             openPhoto(index, showMerged) {
-                if (!this.results[index]) {
+                if (this.loading || this.viewer.loading || !this.results[index]) {
                     return false;
                 }
 
-                if (showMerged && (this.results[index].Type === 'video' || this.results[index].Type === 'live')) {
-                    if (this.results[index].isPlayable()) {
-                        this.$modal.show('video', {video: this.results[index], album: null});
+                const selected = this.results[index];
+
+                if (showMerged && (selected.Type === 'video' || selected.Type === 'live')) {
+                    if (selected.isPlayable()) {
+                        this.$modal.show('video', {video: selected, album: null});
                     } else {
                         this.$viewer.show(Thumb.fromPhotos(this.results), index);
                     }
                 } else if (showMerged) {
-                    this.$viewer.show(Thumb.fromFiles([this.results[index]]), 0)
+                    this.$viewer.show(Thumb.fromFiles([selected]), 0)
                 } else {
-                    this.$viewer.show(Thumb.fromPhotos(this.results), index);
+                    this.viewerResults().then((results) => {
+                        const thumbsIndex = results.findIndex(result => result.UID === selected.UID);
+
+                        if(thumbsIndex < 0) {
+                            this.$viewer.show(Thumb.fromPhotos(this.results), index);
+                        } else {
+                            this.$viewer.show(Thumb.fromPhotos(results), thumbsIndex);
+                        }
+                    });
                 }
+            },
+            viewerResults() {
+                if (this.complete || this.loading || this.viewer.loading) {
+                    return Promise.resolve(this.results);
+                }
+
+                if (this.viewer.results.length > (this.results.length + this.pageSize)) {
+                    return Promise.resolve(this.viewer.results);
+                }
+
+                this.viewer.loading = true;
+
+                const count = this.pageSize*(this.page + 6);
+                const offset = 0;
+
+                const params = {
+                    count: count,
+                    offset: offset,
+                    merged: true,
+                };
+
+                Object.assign(params, this.lastFilter);
+
+                if (this.staticFilter) {
+                    Object.assign(params, this.staticFilter);
+                }
+
+                return Photo.search(params).then((resp) => {
+                        // Success.
+                        this.viewer.loading = false;
+                        this.viewer.results = resp.models;
+                        return Promise.resolve(this.viewer.results);
+                    }, () => {
+                        // Error.
+                        this.viewer.loading = false;
+                        return Promise.resolve(this.results);
+                    }
+                );
             },
             loadMore() {
                 if (this.scrollDisabled) return;
@@ -223,15 +276,20 @@
 
                 Photo.search(params).then(response => {
                     this.results = Photo.mergeResponse(this.results, response);
+                    this.complete = (response.count < count);
+                    this.scrollDisabled = this.complete;
 
-                    this.scrollDisabled = (response.count < count);
-
-                    if (this.scrollDisabled) {
+                    if (this.complete) {
                         this.offset = offset;
 
                         if (this.results.length > 1) {
-                            this.$notify.info(this.$gettext('All ') + this.results.length + this.$gettext(' photos loaded'));
+                            this.$notify.info(this.$gettextInterpolate(this.$gettext("Showing all %{n} results"), {n: this.results.length}));
                         }
+                    } else if (this.results.length >= Photo.limit()) {
+                        this.offset = offset;
+                        this.complete = true;
+                        this.scrollDisabled = true;
+                        this.$notify.warn(this.$gettext("Can't load more, limit reached"));
                     } else {
                         this.offset = offset + count;
                         this.page++;
@@ -242,9 +300,20 @@
                     this.dirty = false;
                     this.loading = false;
                     this.listen = true;
+
+                    if(offset === 0) {
+                        this.viewerResults();
+                    }
                 });
             },
             updateQuery() {
+                const len = this.filter.q.length;
+
+                if (len > 1 && len < 3) {
+                    this.$notify.error(this.$gettext("Search term too short"));
+                    return;
+                }
+
                 const query = {
                     view: this.settings.view
                 };
@@ -261,7 +330,7 @@
                     return
                 }
 
-                this.$router.replace({query: query});
+                this.$router.replace({query});
             },
             searchParams() {
                 const params = {
@@ -279,11 +348,16 @@
                 return params;
             },
             refresh() {
-                if (this.loading) return;
+                if (this.loading) {
+                    return;
+                }
+
                 this.loading = true;
                 this.page = 0;
                 this.dirty = true;
+                this.complete = false;
                 this.scrollDisabled = false;
+
                 this.loadMore();
             },
             search() {
@@ -301,26 +375,26 @@
                 this.page = 0;
                 this.loading = true;
                 this.listen = false;
+                this.complete = false;
 
                 const params = this.searchParams();
 
                 Photo.search(params).then(response => {
                     this.offset = this.pageSize;
-
                     this.results = response.models;
+                    this.complete = (response.count < this.pageSize);
+                    this.scrollDisabled = this.complete;
 
-                    this.scrollDisabled = (response.count < this.pageSize);
-
-                    if (this.scrollDisabled) {
+                    if (this.complete) {
                         if (!this.results.length) {
-                            this.$notify.warn(this.$gettext("No photos found"));
+                            this.$notify.warn(this.$gettext("No results"));
                         } else if (this.results.length === 1) {
-                            this.$notify.info(this.$gettext("One photo found"));
+                            this.$notify.info(this.$gettext("One result"));
                         } else {
-                            this.$notify.info(this.results.length + this.$gettext(" photos found"));
+                            this.$notify.info(this.$gettextInterpolate(this.$gettext("%{n} results"), {n: this.results.length}));
                         }
                     } else {
-                        this.$notify.info(this.$gettext('More than 50 photos found'));
+                        this.$notify.info(this.$gettext('More than 50 results'));
 
                         this.$nextTick(() => this.$emit("scrollRefresh"));
                     }
@@ -328,12 +402,32 @@
                     this.dirty = false;
                     this.loading = false;
                     this.listen = true;
+
+                    this.viewerResults();
                 });
             },
             onImportCompleted() {
                 if (!this.listen) return;
 
                 this.loadMore();
+            },
+            updateResult(results, values) {
+                const model = results.find((m) => m.UID === values.UID);
+
+                if (model) {
+                    for (let key in values) {
+                        if (values.hasOwnProperty(key) && values[key] != null && typeof values[key] !== "object") {
+                            model[key] = values[key];
+                        }
+                    }
+                }
+            },
+            removeResult(results, uid) {
+                const index = results.findIndex((m) => m.UID === uid);
+
+                if (index >= 0) {
+                    results.splice(index, 1);
+                }
             },
             onUpdate(ev, data) {
                 if (!this.listen) return;
@@ -348,44 +442,36 @@
                     case 'updated':
                         for (let i = 0; i < data.entities.length; i++) {
                             const values = data.entities[i];
-                            const model = this.results.find((m) => m.UID === values.UID);
 
-                            if (model) {
-                                for (let key in values) {
-                                    if (values.hasOwnProperty(key) && values[key] != null && typeof values[key] !== "object") {
-                                        model[key] = values[key];
-                                    }
-                                }
-                            }
+                            this.updateResult(this.results, values);
+                            this.updateResult(this.viewer.results, values);
                         }
                         break;
                     case 'restored':
                         this.dirty = true;
+                        this.complete = false;
 
                         if (this.context !== "archive") break;
 
                         for (let i = 0; i < data.entities.length; i++) {
                             const uid = data.entities[i];
-                            const index = this.results.findIndex((m) => m.UID === uid);
-                            if (index >= 0) {
-                                this.results.splice(index, 1);
-                            }
+
+                            this.removeResult(this.results, uid);
+                            this.removeResult(this.viewer.results, uid);
                         }
 
                         break;
                     case 'archived':
                         this.dirty = true;
+                        this.complete = false;
 
                         if (this.context === "archive") break;
 
                         for (let i = 0; i < data.entities.length; i++) {
                             const uid = data.entities[i];
-                            const index = this.results.findIndex((m) => m.UID === uid);
 
-                            if (index >= 0) {
-                                this.results.splice(index, 1);
-                            }
-
+                            this.removeResult(this.results, uid);
+                            this.removeResult(this.viewer.results, uid);
                             this.$clipboard.removeId(uid);
                         }
 
@@ -393,6 +479,7 @@
                     case 'created':
                         this.dirty = true;
                         this.scrollDisabled = false;
+                        this.complete = false;
 
                         break;
                     default:

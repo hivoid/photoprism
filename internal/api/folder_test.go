@@ -13,13 +13,13 @@ func TestGetFoldersOriginals(t *testing.T) {
 	t.Run("flat", func(t *testing.T) {
 		app, router, conf := NewApiTest()
 		_ = conf.CreateDirectories()
-		expected, err := fs.Dirs(conf.OriginalsPath(), false)
+		expected, err := fs.Dirs(conf.OriginalsPath(), false, true)
 
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		GetFoldersOriginals(router, conf)
+		GetFoldersOriginals(router)
 		r := PerformRequest(app, "GET", "/api/v1/folders/originals")
 
 		// t.Logf("RESPONSE: %s", r.Body.Bytes())
@@ -52,18 +52,16 @@ func TestGetFoldersOriginals(t *testing.T) {
 			assert.Equal(t, false, folder.FolderIgnore)
 			assert.Equal(t, false, folder.FolderWatch)
 		}
-
-		// t.Logf("ORIGINALS: %+v", folders)
 	})
 	t.Run("recursive", func(t *testing.T) {
 		app, router, conf := NewApiTest()
 		_ = conf.CreateDirectories()
-		expected, err := fs.Dirs(conf.OriginalsPath(), true)
+		expected, err := fs.Dirs(conf.OriginalsPath(), true, true)
 
 		if err != nil {
 			t.Fatal(err)
 		}
-		GetFoldersOriginals(router, conf)
+		GetFoldersOriginals(router)
 		r := PerformRequest(app, "GET", "/api/v1/folders/originals?recursive=true")
 
 		// t.Logf("RESPONSE: %s", r.Body.Bytes())
@@ -91,8 +89,6 @@ func TestGetFoldersOriginals(t *testing.T) {
 			assert.Equal(t, false, folder.FolderIgnore)
 			assert.Equal(t, false, folder.FolderWatch)
 		}
-
-		// t.Logf("ORIGINALS RECURSIVE: %+v", folders)
 	})
 }
 
@@ -100,13 +96,13 @@ func TestGetFoldersImport(t *testing.T) {
 	t.Run("flat", func(t *testing.T) {
 		app, router, conf := NewApiTest()
 		_ = conf.CreateDirectories()
-		expected, err := fs.Dirs(conf.ImportPath(), false)
+		expected, err := fs.Dirs(conf.ImportPath(), false, true)
 
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		GetFoldersImport(router, conf)
+		GetFoldersImport(router)
 		r := PerformRequest(app, "GET", "/api/v1/folders/import")
 
 		// t.Logf("RESPONSE: %s", r.Body.Bytes())
@@ -123,8 +119,6 @@ func TestGetFoldersImport(t *testing.T) {
 		if len(folders) != len(expected) {
 			t.Fatalf("response contains %d folders", len(folders))
 		}
-
-		// t.Logf("IMPORT FOLDERS: %+v", folders)
 
 		if len(folders) == 0 {
 			// There are no existing folders, that's ok.
@@ -146,13 +140,13 @@ func TestGetFoldersImport(t *testing.T) {
 	t.Run("recursive", func(t *testing.T) {
 		app, router, conf := NewApiTest()
 		_ = conf.CreateDirectories()
-		expected, err := fs.Dirs(conf.ImportPath(), true)
+		expected, err := fs.Dirs(conf.ImportPath(), true, true)
 
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		GetFoldersImport(router, conf)
+		GetFoldersImport(router)
 		r := PerformRequest(app, "GET", "/api/v1/folders/import?recursive=true")
 
 		var resp FoldersResponse
@@ -178,7 +172,5 @@ func TestGetFoldersImport(t *testing.T) {
 			assert.Equal(t, false, folder.FolderIgnore)
 			assert.Equal(t, false, folder.FolderWatch)
 		}
-
-		// t.Logf("IMPORT FOLDERS RECURSIVE: %+v", folders)
 	})
 }

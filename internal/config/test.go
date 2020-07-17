@@ -54,7 +54,7 @@ func NewTestParams() *Params {
 	c := &Params{
 		Name:           "PhotoPrism",
 		Version:        "0.0.0",
-		Copyright:      "(c) 2018-2020 PhotoPrism.org",
+		Copyright:      "(c) 2018-2020 Michael Mayer",
 		Debug:          true,
 		Public:         true,
 		ReadOnly:       false,
@@ -72,6 +72,7 @@ func NewTestParams() *Params {
 		SettingsPath:   testDataPath + "/settings",
 		DatabaseDriver: dbDriver,
 		DatabaseDsn:    dbDsn,
+		AdminPassword:  "photoprism",
 	}
 
 	return c
@@ -90,8 +91,8 @@ func NewTestParamsError() *Params {
 		OriginalsPath:  testDataPath + "/originals",
 		ImportPath:     testDataPath + "/import",
 		TempPath:       testDataPath + "/temp",
-		DatabaseDriver: MySQL,
-		DatabaseDsn:    "photoprism:photoprism@tcp(photoprism-db:4001)/photoprism?parseTime=true",
+		DatabaseDriver: SQLite,
+		DatabaseDsn:    ".test-error.db",
 	}
 
 	return c
@@ -139,7 +140,7 @@ func NewTestConfig() *Config {
 	c.InitTestDb()
 
 	thumb.Size = c.ThumbSize()
-	thumb.Limit = c.ThumbLimit()
+	thumb.Limit = c.ThumbSizeUncached()
 	thumb.Filter = c.ThumbFilter()
 	thumb.JpegQuality = c.JpegQuality()
 
@@ -149,12 +150,13 @@ func NewTestConfig() *Config {
 // NewTestErrorConfig inits invalid config used for testing
 func NewTestErrorConfig() *Config {
 	c := &Config{params: NewTestParamsError()}
-	err := c.Init(context.Background())
-	if err != nil {
+
+	c.initSettings()
+
+	if err := c.Init(context.Background()); err != nil {
 		log.Fatalf("config: %s", err.Error())
 	}
 
-	c.InitDb()
 	return c
 }
 
@@ -165,6 +167,7 @@ func CliTestContext() *cli.Context {
 	globalSet := flag.NewFlagSet("test", 0)
 	globalSet.Bool("debug", false, "doc")
 	globalSet.String("storage-path", config.StoragePath, "doc")
+	globalSet.String("sidecar-path", config.SidecarPath, "doc")
 	globalSet.String("config-file", config.ConfigFile, "doc")
 	globalSet.String("assets-path", config.AssetsPath, "doc")
 	globalSet.String("originals-path", config.OriginalsPath, "doc")
@@ -172,6 +175,7 @@ func CliTestContext() *cli.Context {
 	globalSet.String("temp-path", config.OriginalsPath, "doc")
 	globalSet.String("cache-path", config.OriginalsPath, "doc")
 	globalSet.String("darktable-cli", config.DarktableBin, "doc")
+	globalSet.String("admin-password", config.DarktableBin, "doc")
 	globalSet.Bool("detect-nsfw", config.DetectNSFW, "doc")
 
 	app := cli.NewApp()
@@ -180,6 +184,7 @@ func CliTestContext() *cli.Context {
 	c := cli.NewContext(app, globalSet, nil)
 
 	LogError(c.Set("storage-path", config.StoragePath))
+	LogError(c.Set("sidecar-path", config.SidecarPath))
 	LogError(c.Set("config-file", config.ConfigFile))
 	LogError(c.Set("assets-path", config.AssetsPath))
 	LogError(c.Set("originals-path", config.OriginalsPath))
@@ -187,6 +192,7 @@ func CliTestContext() *cli.Context {
 	LogError(c.Set("temp-path", config.TempPath))
 	LogError(c.Set("cache-path", config.CachePath))
 	LogError(c.Set("darktable-cli", config.DarktableBin))
+	LogError(c.Set("admin-password", config.AdminPassword))
 	LogError(c.Set("detect-nsfw", "true"))
 
 	return c

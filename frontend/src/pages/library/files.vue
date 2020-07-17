@@ -1,127 +1,123 @@
 <template>
-    <div class="p-page p-page-files">
-        <v-form ref="form" class="p-files-search" lazy-validation @submit.prevent="updateQuery" dense>
-            <v-toolbar flat color="secondary">
-                <v-toolbar-title>
-                    <router-link to="/library/files">
-                        <translate key="Originals">Originals</translate>
-                    </router-link>
+  <div class="p-page p-page-files">
+    <v-form ref="form" class="p-files-search" lazy-validation @submit.prevent="updateQuery" dense>
+      <v-toolbar flat color="secondary">
+        <v-toolbar-title>
+          <router-link to="/library/files">
+            <translate key="Originals">Originals</translate>
+          </router-link>
 
-                    <router-link v-for="(item, index) in breadcrumbs" :key="index" :to="item.path">
-                        <v-icon>navigate_next</v-icon>
-                        {{item.name}}
-                    </router-link>
-                </v-toolbar-title>
+          <router-link v-for="(item, index) in breadcrumbs" :key="index" :to="item.path">
+            <v-icon>navigate_next</v-icon>
+            {{item.name}}
+          </router-link>
+        </v-toolbar-title>
 
-                <v-spacer></v-spacer>
+        <v-spacer></v-spacer>
 
-                <v-btn icon @click.stop="refresh">
-                    <v-icon>refresh</v-icon>
-                </v-btn>
-            </v-toolbar>
-        </v-form>
+        <v-btn icon @click.stop="refresh">
+          <v-icon>refresh</v-icon>
+        </v-btn>
+      </v-toolbar>
+    </v-form>
 
-        <v-container fluid class="pa-4" v-if="loading">
-            <v-progress-linear color="secondary-dark" :indeterminate="true"></v-progress-linear>
-        </v-container>
-        <v-container fluid class="pa-0" v-else>
-            <p-file-clipboard :refresh="refresh" :selection="selection"
-                                :clear-selection="clearSelection"></p-file-clipboard>
+    <v-container fluid class="pa-4" v-if="loading">
+      <v-progress-linear color="secondary-dark" :indeterminate="true"></v-progress-linear>
+    </v-container>
+    <v-container fluid class="pa-0" v-else>
+      <p-file-clipboard :refresh="refresh" :selection="selection"
+                        :clear-selection="clearSelection"></p-file-clipboard>
 
-            <p-scroll-top></p-scroll-top>
+      <p-scroll-top></p-scroll-top>
 
-            <v-container grid-list-xs fluid class="pa-2 p-files p-files-cards">
-                <v-card v-if="results.length === 0" class="p-files-empty secondary-light lighten-1 ma-1" flat>
-                    <v-card-title primary-title>
-                        <div>
-                            <h3 class="title mb-3">
-                                <translate key="nofolders">No files matched your search</translate>
-                            </h3>
-                            <div>
-                                <translate key="tryagain">Please re-index your originals if a file you expect is
-                                    missing.
-                                </translate>
-                            </div>
-                        </div>
-                    </v-card-title>
-                </v-card>
-                <v-layout row wrap class="p-files-results">
-                    <v-flex
-                            v-for="(model, index) in results"
-                            :key="index"
-                            :data-uid="model.UID"
-                            class="p-file"
-                            xs6 sm4 md3 lg2 d-flex
-                    >
-                        <v-hover>
-                            <v-card tile class="accent lighten-3 clickable"
-                                    slot-scope="{ hover }"
-                                    @contextmenu="onContextMenu($event, index)"
-                                    :dark="selection.includes(model.UID)"
-                                    :class="selection.includes(model.UID) ? 'elevation-10 ma-0 darken-1 white--text' : 'elevation-0 ma-1 lighten-3'">
-                                <v-img
-                                        :src="model.thumbnailUrl('tile_500')"
-                                        @mousedown="onMouseDown($event, index)"
-                                        @click="onClick($event, index)"
-                                        aspect-ratio="1"
-                                        class="accent lighten-2"
-                                >
-                                    <v-layout
-                                            slot="placeholder"
-                                            fill-height
-                                            align-center
-                                            justify-center
-                                            ma-0
-                                    >
-                                        <v-progress-circular indeterminate
-                                                             color="accent lighten-5"></v-progress-circular>
-                                    </v-layout>
+      <v-container grid-list-xs fluid class="pa-2 p-files p-files-cards">
+        <v-card v-if="results.length === 0" class="p-files-empty secondary-light lighten-1 ma-1" flat>
+          <v-card-title primary-title>
+            <div>
+              <h3 class="title ma-0 pa-0">
+                <translate>Couldn't find anything</translate>
+              </h3>
+              <p class="mt-4 mb-0 pa-0">
+                <translate>Duplicates will be skipped and only appear once.</translate>
+                <translate>If a file you expect is missing, please re-index your library and wait until indexing has been completed.</translate>
+              </p>
+            </div>
+          </v-card-title>
+        </v-card>
+        <v-layout row wrap class="p-files-results">
+          <v-flex
+                  v-for="(model, index) in results"
+                  :key="index"
+                  :data-uid="model.UID"
+                  class="p-file"
+                  xs6 sm4 md3 lg2 d-flex
+          >
+            <v-hover>
+              <v-card tile class="accent lighten-3 clickable"
+                      slot-scope="{ hover }"
+                      @contextmenu="onContextMenu($event, index)"
+                      :dark="selection.includes(model.UID)"
+                      :class="selection.includes(model.UID) ? 'elevation-10 ma-0 darken-1 white--text' : 'elevation-0 ma-1 lighten-3'">
+                <v-img
+                        :src="model.thumbnailUrl('tile_500')"
+                        @mousedown="onMouseDown($event, index)"
+                        @click="onClick($event, index)"
+                        aspect-ratio="1"
+                        class="accent lighten-2"
+                >
+                  <v-layout
+                          slot="placeholder"
+                          fill-height
+                          align-center
+                          justify-center
+                          ma-0
+                  >
+                    <v-progress-circular indeterminate
+                                         color="accent lighten-5"></v-progress-circular>
+                  </v-layout>
 
-                                    <v-btn v-if="hover || selection.includes(model.UID)" :flat="!hover" :ripple="false"
-                                           icon large absolute
-                                           :class="selection.includes(model.UID) ? 'p-file-select' : 'p-file-select opacity-50'"
-                                           @click.stop.prevent="onSelect($event, index)">
-                                        <v-icon v-if="selection.includes(model.UID)" color="white" class="t-select t-on">check_circle
-                                        </v-icon>
-                                        <v-icon v-else color="accent lighten-3" class="t-select t-off">radio_button_off</v-icon>
-                                    </v-btn>
-                                </v-img>
+                  <v-btn v-if="hover || selection.includes(model.UID)" :flat="!hover" :ripple="false"
+                         icon large absolute
+                         :class="selection.includes(model.UID) ? 'p-file-select' : 'p-file-select opacity-50'"
+                         @click.stop.prevent="onSelect($event, index)">
+                    <v-icon v-if="selection.includes(model.UID)" color="white" class="t-select t-on">check_circle
+                    </v-icon>
+                    <v-icon v-else color="accent lighten-3" class="t-select t-off">radio_button_off</v-icon>
+                  </v-btn>
+                </v-img>
 
-                                <v-card-title primary-title class="pa-3 p-photo-desc" style="user-select: none;"
-                                              v-if="model.isFile()">
-                                    <div>
-                                    <h3 class="body-2 mb-2" :title="model.Name">
-                                        <button @click.exact="openFile(index)">
-                                            {{ model.baseName(19) }}
-                                        </button>
-                                    </h3>
-                                    <div class="caption" title="Info">
-                                        {{ model.getInfo() }}
-                                    </div>
-                                    </div>
-                                </v-card-title>
-                                <v-card-title primary-title class="pa-3 p-photo-desc" v-else>
-                                    <div>
-                                    <h3 class="body-2 mb-2" :title="model.Title">
-                                        <button @click.exact="openFile(index)">
-                                            {{ model.Title }}
-                                        </button>
-                                    </h3>
-                                    <div class="caption" title="Path" v-if="model.Title !== model.Path">
-                                        /{{ model.Path }}
-                                    </div>
-                                    <div class="caption" title="Path" v-else>
-                                        <translate key="Folder">Folder</translate>
-                                    </div>
-                                    </div>
-                                </v-card-title>
-                            </v-card>
-                        </v-hover>
-                    </v-flex>
-                </v-layout>
-            </v-container>
-        </v-container>
-    </div>
+                <v-card-title primary-title class="pa-3 p-photo-desc" style="user-select: none;"
+                              v-if="model.isFile()">
+                  <div>
+                    <h3 class="body-2 mb-2" :title="model.Name">
+                      <button @click.exact="openFile(index)">
+                        {{ model.baseName() }}
+                      </button>
+                    </h3>
+                    <div class="caption" title="Info">
+                      {{ model.getInfo() }}
+                    </div>
+                  </div>
+                </v-card-title>
+                <v-card-title primary-title class="pa-3 p-photo-desc" v-else>
+                  <div>
+                    <h3 class="body-2 mb-2" :title="model.Title">
+                      <button @click.exact="openFile(index)">
+                        {{ model.baseName() }}
+                      </button>
+                    </h3>
+                    <div class="caption" title="Path">
+                      <translate key="Folder">Folder</translate>
+                    </div>
+                  </div>
+                </v-card-title>
+              </v-card>
+            </v-hover>
+          </v-flex>
+        </v-layout>
+      </v-container>
+    </v-container>
+  </div>
 </template>
 
 <script>
@@ -163,15 +159,17 @@
                 dirty: false,
                 results: [],
                 loading: true,
-                pageSize: 24,
-                offset: 0,
-                page: 0,
                 selection: [],
                 settings: settings,
                 filter: filter,
                 lastFilter: {},
                 routeName: routeName,
                 path: "",
+                page: 0,
+                files: {
+                    limit: Folder.limit(),
+                    offset: 0,
+                },
                 labels: {
                     search: this.$gettext("Search"),
                     name: this.$gettext("Folder Name"),
@@ -338,6 +336,13 @@
                 this.lastId = "";
             },
             updateQuery() {
+                const len = this.filter.q.length;
+
+                if (len > 1 && len < 3) {
+                    this.$notify.error(this.$gettext("Search term too short"));
+                    return;
+                }
+
                 const query = {
                     view: this.settings.view
                 };
@@ -360,6 +365,8 @@
                 const params = {
                     files: true,
                     uncached: true,
+                    count: this.files.limit,
+                    offset: this.files.offset,
                 };
 
                 Object.assign(params, this.filter);
@@ -387,7 +394,7 @@
 
                 Object.assign(this.lastFilter, this.filter);
 
-                this.offset = 0;
+                this.files.offset = 0;
                 this.page = 0;
                 this.loading = true;
                 this.listen = false;
@@ -395,17 +402,23 @@
                 const params = this.searchParams();
 
                 Folder.originals(this.path, params).then(response => {
-                    this.offset = this.pageSize;
+                    this.files.offset = this.files.limit;
 
                     this.results = response.models;
                     this.breadcrumbs = this.getBreadcrumbs();
 
                     if (response.count === 0) {
-                        this.$notify.warn(this.$gettext('Directory is empty'));
-                    } else if (response.count === 1) {
-                        this.$notify.info(this.$gettext('One entry found'));
+                        this.$notify.warn(this.$gettext('Folder is empty'));
+                    } else if (response.files === 1) {
+                        this.$notify.info(this.$gettext('One file found'));
+                    } else if (response.files === 0 && response.folders === 1) {
+                        this.$notify.info(this.$gettext('One folder found'));
+                    } else if (response.files === 0 && response.folders > 1) {
+                        this.$notify.info(this.$gettextInterpolate(this.$gettext("%{n} folders found"), {n: response.folders}));
+                    } else if (response.files < this.files.limit) {
+                        this.$notify.info(this.$gettextInterpolate(this.$gettext("Folder contains %{n} files"), {n: response.files}));
                     } else {
-                        this.$notify.info(response.count + this.$gettext(' entries found'));
+                        this.$notify.warn(this.$gettextInterpolate(this.$gettext("Limit reached, showing first %{n} files"), {n: response.files}));
                     }
                 }).finally(() => {
                     this.dirty = false;

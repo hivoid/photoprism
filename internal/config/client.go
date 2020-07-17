@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/photoprism/photoprism/internal/entity"
-	"github.com/photoprism/photoprism/pkg/capture"
 	"github.com/photoprism/photoprism/pkg/colors"
 	"github.com/photoprism/photoprism/pkg/fs"
 	"github.com/photoprism/photoprism/pkg/txt"
@@ -18,6 +17,7 @@ type ClientConfig struct {
 	Copyright       string              `json:"copyright"`
 	Flags           string              `json:"flags"`
 	SiteUrl         string              `json:"siteUrl"`
+	SitePreview     string              `json:"sitePreview"`
 	SiteTitle       string              `json:"siteTitle"`
 	SiteCaption     string              `json:"siteCaption"`
 	SiteDescription string              `json:"siteDescription"`
@@ -33,7 +33,7 @@ type ClientConfig struct {
 	Cameras         []entity.Camera     `json:"cameras"`
 	Lenses          []entity.Lens       `json:"lenses"`
 	Countries       []entity.Country    `json:"countries"`
-	Thumbnails      []Thumbnail         `json:"thumbnails"`
+	Thumbs          []Thumb             `json:"thumbs"`
 	DownloadToken   string              `json:"downloadToken"`
 	PreviewToken    string              `json:"previewToken"`
 	JSHash          string              `json:"jsHash"`
@@ -65,6 +65,7 @@ type ClientCounts struct {
 	Folders        int `json:"folders"`
 	Files          int `json:"files"`
 	Places         int `json:"places"`
+	States         int `json:"states"`
 	Labels         int `json:"labels"`
 	LabelMaxPhotos int `json:"labelMaxPhotos"`
 }
@@ -76,11 +77,11 @@ type CategoryLabel struct {
 }
 
 type ClientPosition struct {
-	PhotoUID   string    `json:"uid"`
-	LocationID string    `json:"loc"`
-	TakenAt    time.Time `json:"utc"`
-	PhotoLat   float64   `json:"lat"`
-	PhotoLng   float64   `json:"lng"`
+	PhotoUID string    `json:"uid"`
+	CellID   string    `json:"cid"`
+	TakenAt  time.Time `json:"utc"`
+	PhotoLat float64   `json:"lat"`
+	PhotoLng float64   `json:"lng"`
 }
 
 // Flags returns config flags as string slice.
@@ -108,19 +109,25 @@ func (c *Config) Flags() (flags []string) {
 	return flags
 }
 
-// PublicClientConfig returns reduced config values for non-public sites.
-func (c *Config) PublicClientConfig() ClientConfig {
+// PublicConfig returns public client config values with as little information as possible.
+func (c *Config) PublicConfig() ClientConfig {
 	if c.Public() {
-		return c.ClientConfig()
+		return c.UserConfig()
 	}
 
 	settings := c.Settings()
 
 	result := ClientConfig{
-		Settings:        Settings{Language: settings.Language, Theme: settings.Theme},
+		Settings: Settings{
+			Language: settings.Language,
+			Theme:    settings.Theme,
+			Maps:     settings.Maps,
+			Features: settings.Features,
+		},
 		Flags:           strings.Join(c.Flags(), " "),
 		Name:            c.Name(),
 		SiteUrl:         c.SiteUrl(),
+		SitePreview:     c.SitePreview(),
 		SiteTitle:       c.SiteTitle(),
 		SiteCaption:     c.SiteCaption(),
 		SiteDescription: c.SiteDescription(),
@@ -131,10 +138,10 @@ func (c *Config) PublicClientConfig() ClientConfig {
 		ReadOnly:        c.ReadOnly(),
 		Public:          c.Public(),
 		Experimental:    c.Experimental(),
-		Thumbnails:      Thumbnails,
+		Thumbs:          Thumbs,
 		Colors:          colors.All.List(),
-		JSHash:          fs.Checksum(c.StaticBuildPath() + "/app.js"),
-		CSSHash:         fs.Checksum(c.StaticBuildPath() + "/app.css"),
+		JSHash:          fs.Checksum(c.BuildPath() + "/app.js"),
+		CSSHash:         fs.Checksum(c.BuildPath() + "/app.css"),
 		Clip:            txt.ClipDefault,
 		PreviewToken:    "public",
 		DownloadToken:   "public",
@@ -143,15 +150,53 @@ func (c *Config) PublicClientConfig() ClientConfig {
 	return result
 }
 
-// ClientConfig returns a loaded and set configuration entity.
-func (c *Config) ClientConfig() ClientConfig {
-	defer log.Debug(capture.Time(time.Now(), "config: client config created"))
+// GuestConfig returns client config values for the sharing with guests.
+func (c *Config) GuestConfig() ClientConfig {
+	settings := c.Settings()
 
+	result := ClientConfig{
+		Settings: Settings{
+			Language: settings.Language,
+			Theme:    settings.Theme,
+			Maps:     settings.Maps,
+			Features: settings.Features,
+		},
+		Flags:           "readonly public shared",
+		Name:            c.Name(),
+		SiteUrl:         c.SiteUrl(),
+		SitePreview:     c.SitePreview(),
+		SiteTitle:       c.SiteTitle(),
+		SiteCaption:     c.SiteCaption(),
+		SiteDescription: c.SiteDescription(),
+		SiteAuthor:      c.SiteAuthor(),
+		Version:         c.Version(),
+		Copyright:       c.Copyright(),
+		Debug:           c.Debug(),
+		ReadOnly:        true,
+		UploadNSFW:      c.UploadNSFW(),
+		DisableSettings: true,
+		Public:          true,
+		Experimental:    false,
+		Colors:          colors.All.List(),
+		Thumbs:          Thumbs,
+		DownloadToken:   c.DownloadToken(),
+		PreviewToken:    c.PreviewToken(),
+		JSHash:          fs.Checksum(c.BuildPath() + "/share.js"),
+		CSSHash:         fs.Checksum(c.BuildPath() + "/share.css"),
+		Clip:            txt.ClipDefault,
+	}
+
+	return result
+}
+
+// UserConfig returns client configuration values for registered users.
+func (c *Config) UserConfig() ClientConfig {
 	result := ClientConfig{
 		Settings:        *c.Settings(),
 		Flags:           strings.Join(c.Flags(), " "),
 		Name:            c.Name(),
 		SiteUrl:         c.SiteUrl(),
+		SitePreview:     c.SitePreview(),
 		SiteTitle:       c.SiteTitle(),
 		SiteCaption:     c.SiteCaption(),
 		SiteDescription: c.SiteDescription(),
@@ -165,17 +210,17 @@ func (c *Config) ClientConfig() ClientConfig {
 		Public:          c.Public(),
 		Experimental:    c.Experimental(),
 		Colors:          colors.All.List(),
-		Thumbnails:      Thumbnails,
+		Thumbs:          Thumbs,
 		DownloadToken:   c.DownloadToken(),
 		PreviewToken:    c.PreviewToken(),
-		JSHash:          fs.Checksum(c.StaticBuildPath() + "/app.js"),
-		CSSHash:         fs.Checksum(c.StaticBuildPath() + "/app.css"),
+		JSHash:          fs.Checksum(c.BuildPath() + "/app.js"),
+		CSSHash:         fs.Checksum(c.BuildPath() + "/app.css"),
 		Clip:            txt.ClipDefault,
 		Server:          NewRuntimeInfo(),
 	}
 
 	c.Db().Table("photos").
-		Select("photo_uid, location_id, photo_lat, photo_lng, taken_at").
+		Select("photo_uid, cell_id, photo_lat, photo_lng, taken_at").
 		Where("deleted_at IS NULL AND photo_lat != 0 AND photo_lng != 0").
 		Order("taken_at DESC").
 		Limit(1).Offset(0).
@@ -205,7 +250,7 @@ func (c *Config) ClientConfig() ClientConfig {
 		Take(&result.Count)
 
 	c.Db().Table("albums").
-		Select("SUM(album_type = ?) AS albums, SUM(album_type = ?) AS moments, SUM(album_type = ?) AS months, SUM(album_type = ?) AS folders", entity.TypeAlbum, entity.TypeMoment, entity.TypeMonth, entity.TypeFolder).
+		Select("SUM(album_type = ?) AS albums, SUM(album_type = ?) AS moments, SUM(album_type = ?) AS months, SUM(album_type = ?) AS states, SUM(album_type = ?) AS folders", entity.AlbumDefault, entity.AlbumMoment, entity.AlbumMonth, entity.AlbumState, entity.AlbumFolder).
 		Where("deleted_at IS NULL").
 		Take(&result.Count)
 

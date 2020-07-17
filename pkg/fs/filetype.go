@@ -48,6 +48,7 @@ var FileExt = FileExtensions{
 	".tif":  TypeTiff,
 	".tiff": TypeTiff,
 	".png":  TypePng,
+	".pn":   TypePng,
 	".crw":  TypeRaw,
 	".cr2":  TypeRaw,
 	".nef":  TypeRaw,
@@ -111,6 +112,24 @@ var FileExt = FileExtensions{
 	".json": TypeJson,
 }
 
+func (m FileExtensions) Known(name string) bool {
+	if name == "" {
+		return false
+	}
+
+	ext := strings.ToLower(filepath.Ext(name))
+
+	if ext == "" {
+		return false
+	}
+
+	if _, ok := m[ext]; ok {
+		return true
+	}
+
+	return false
+}
+
 func (m FileExtensions) TypeExt() TypeExtensions {
 	result := make(TypeExtensions)
 
@@ -130,7 +149,7 @@ var TypeExt = FileExt.TypeExt()
 
 // Find returns the first filename with the same base name and a given type.
 func (t FileType) Find(fileName string, stripSequence bool) string {
-	base := Base(fileName, stripSequence)
+	base := BasePrefix(fileName, stripSequence)
 	dir := filepath.Dir(fileName)
 
 	prefix := filepath.Join(dir, base)
@@ -168,7 +187,7 @@ func GetFileType(fileName string) FileType {
 
 // FindFirst searches a list of directories for the first file with the same base name and a given type.
 func (t FileType) FindFirst(fileName string, dirs []string, baseDir string, stripSequence bool) string {
-	fileBase := Base(fileName, stripSequence)
+	fileBase := BasePrefix(fileName, stripSequence)
 	fileBaseLower := strings.ToLower(fileBase)
 	fileBaseUpper := strings.ToUpper(fileBase)
 
@@ -187,7 +206,7 @@ func (t FileType) FindFirst(fileName string, dirs []string, baseDir string, stri
 
 			if dir != fileDir {
 				if filepath.IsAbs(dir) {
-					dir = filepath.Join(dir, Rel(fileDir, baseDir))
+					dir = filepath.Join(dir, RelName(fileDir, baseDir))
 				} else {
 					dir = filepath.Join(fileDir, dir)
 				}

@@ -21,7 +21,7 @@ type Folders []Folder
 type Folder struct {
 	Path              string     `gorm:"type:varbinary(255);unique_index:idx_folders_path_root;" json:"Path" yaml:"Path"`
 	Root              string     `gorm:"type:varbinary(16);default:'';unique_index:idx_folders_path_root;" json:"Root" yaml:"Root,omitempty"`
-	FolderUID         string     `gorm:"type:varbinary(36);primary_key;" json:"UID,omitempty" yaml:"UID,omitempty"`
+	FolderUID         string     `gorm:"type:varbinary(42);primary_key;" json:"UID,omitempty" yaml:"UID,omitempty"`
 	FolderType        string     `gorm:"type:varbinary(16);" json:"Type" yaml:"Type,omitempty"`
 	FolderTitle       string     `gorm:"type:varchar(255);" json:"Title" yaml:"Title,omitempty"`
 	FolderCategory    string     `gorm:"type:varchar(255);index;" json:"Category" yaml:"Category,omitempty"`
@@ -30,12 +30,12 @@ type Folder struct {
 	FolderCountry     string     `gorm:"type:varbinary(2);index:idx_folders_country_year_month;default:'zz'" json:"Country" yaml:"Country,omitempty"`
 	FolderYear        int        `gorm:"index:idx_folders_country_year_month;" json:"Year" yaml:"Year,omitempty"`
 	FolderMonth       int        `gorm:"index:idx_folders_country_year_month;" json:"Month" yaml:"Month,omitempty"`
+	FolderDay         int        `json:"Day" yaml:"Day,omitempty"`
 	FolderFavorite    bool       `json:"Favorite" yaml:"Favorite,omitempty"`
 	FolderPrivate     bool       `json:"Private" yaml:"Private,omitempty"`
 	FolderIgnore      bool       `json:"Ignore" yaml:"Ignore,omitempty"`
 	FolderWatch       bool       `json:"Watch" yaml:"Watch,omitempty"`
 	FileCount         int        `gorm:"-" json:"FileCount" yaml:"-"`
-	Links             []Link     `gorm:"foreignkey:share_uid;association_foreignkey:folder_uid" json:"Links" yaml:"-"`
 	CreatedAt         time.Time  `json:"-" yaml:"-"`
 	UpdatedAt         time.Time  `json:"-" yaml:"-"`
 	ModifiedAt        *time.Time `json:"ModifiedAt,omitempty" yaml:"-"`
@@ -53,7 +53,7 @@ func (m *Folder) BeforeCreate(scope *gorm.Scope) error {
 
 // NewFolder creates a new file system directory entity.
 func NewFolder(root, pathName string, modTime *time.Time) Folder {
-	now := time.Now().UTC()
+	now := Timestamp()
 
 	pathName = strings.Trim(pathName, string(os.PathSeparator))
 
@@ -101,7 +101,7 @@ func (m *Folder) SetValuesFromPath() {
 
 	if len(m.Path) >= 6 {
 		if date := txt.Time(m.Path); !date.IsZero() {
-			if txt.IsUInt(s) {
+			if txt.IsUInt(s) || txt.IsTime(s) {
 				if date.Day() > 1 {
 					m.FolderTitle = date.Format("January 2, 2006")
 				} else {
@@ -111,6 +111,7 @@ func (m *Folder) SetValuesFromPath() {
 
 			m.FolderYear = date.Year()
 			m.FolderMonth = int(date.Month())
+			m.FolderDay = date.Day()
 		}
 	}
 
@@ -165,12 +166,15 @@ func FirstOrCreateFolder(m *Folder) *Folder {
 
 	if err := Db().Where("path = ? AND root = ?", m.Path, m.Root).First(&result).Error; err == nil {
 		return &result
-	} else if err := m.Create(); err != nil {
-		log.Errorf("folder: %s", err)
-		return nil
+	} else if createErr := m.Create(); createErr == nil {
+		return m
+	} else if err := Db().Where("path = ? AND root = ?", m.Path, m.Root).First(&result).Error; err == nil {
+		return &result
+	} else {
+		log.Errorf("folder: %s (first or create %s)", createErr, m.Path)
 	}
 
-	return m
+	return nil
 }
 
 // Updates selected properties in the database.

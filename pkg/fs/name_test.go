@@ -10,22 +10,25 @@ import (
 
 func TestRel(t *testing.T) {
 	t.Run("same", func(t *testing.T) {
-		assert.Equal(t, "", Rel("/some/path", "/some/path"))
+		assert.Equal(t, "", RelName("/some/path", "/some/path"))
 	})
 	t.Run("short", func(t *testing.T) {
-		assert.Equal(t, "/some/", Rel("/some/", "/some/path"))
+		assert.Equal(t, "/some/", RelName("/some/", "/some/path"))
 	})
 	t.Run("empty", func(t *testing.T) {
-		assert.Equal(t, "", Rel("", "/some/path"))
+		assert.Equal(t, "", RelName("", "/some/path"))
 	})
 	t.Run("/some/path", func(t *testing.T) {
-		assert.Equal(t, "foo/bar.baz", Rel("/some/path/foo/bar.baz", "/some/path"))
+		assert.Equal(t, "foo/bar.baz", RelName("/some/path/foo/bar.baz", "/some/path"))
 	})
 	t.Run("/some/path/", func(t *testing.T) {
-		assert.Equal(t, "foo/bar.baz", Rel("/some/path/foo/bar.baz", "/some/path/"))
+		assert.Equal(t, "foo/bar.baz", RelName("/some/path/foo/bar.baz", "/some/path/"))
 	})
 	t.Run("/some/path/bar", func(t *testing.T) {
-		assert.Equal(t, "/some/path/foo/bar.baz", Rel("/some/path/foo/bar.baz", "/some/path/bar"))
+		assert.Equal(t, "/some/path/foo/bar.baz", RelName("/some/path/foo/bar.baz", "/some/path/bar"))
+	})
+	t.Run("empty dir", func(t *testing.T) {
+		assert.Equal(t, "/some/path/foo/bar.baz", RelName("/some/path/foo/bar.baz", ""))
 	})
 }
 
@@ -56,5 +59,11 @@ func TestFileName(t *testing.T) {
 		result := FileName(Abs("testdata/Test (4).jpg"), tempDir, Abs("testdata"), ".xmp", true)
 
 		assert.Equal(t, tempDir+"/Test.xmp", result)
+	})
+
+	t.Run("empty dir", func(t *testing.T) {
+		result := FileName("testdata/FOO.XMP", "", Abs("testdata"), ".jpeg", true)
+
+		assert.Equal(t, "testdata/FOO.jpeg", result)
 	})
 }

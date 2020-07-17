@@ -14,17 +14,26 @@ import (
 	"github.com/ulule/deepcopier"
 )
 
+const (
+	AlbumDefault = "album"
+	AlbumFolder  = "folder"
+	AlbumMoment  = "moment"
+	AlbumMonth   = "month"
+	AlbumState   = "state"
+)
+
 type Albums []Album
 
 // Album represents a photo album
 type Album struct {
 	ID               uint       `gorm:"primary_key" json:"ID" yaml:"-"`
-	AlbumUID         string     `gorm:"type:varbinary(36);unique_index;" json:"UID" yaml:"UID"`
-	CoverUID         string     `gorm:"type:varbinary(36);" json:"CoverUID" yaml:"CoverUID,omitempty"`
-	FolderUID        string     `gorm:"type:varbinary(36);index;" json:"FolderUID" yaml:"FolderUID,omitempty"`
+	AlbumUID         string     `gorm:"type:varbinary(42);unique_index;" json:"UID" yaml:"UID"`
+	CoverUID         string     `gorm:"type:varbinary(42);" json:"CoverUID" yaml:"CoverUID,omitempty"`
+	FolderUID        string     `gorm:"type:varbinary(42);index;" json:"FolderUID" yaml:"FolderUID,omitempty"`
 	AlbumSlug        string     `gorm:"type:varbinary(255);index;" json:"Slug" yaml:"Slug"`
 	AlbumType        string     `gorm:"type:varbinary(8);default:'album';" json:"Type" yaml:"Type,omitempty"`
 	AlbumTitle       string     `gorm:"type:varchar(255);" json:"Title" yaml:"Title"`
+	AlbumLocation    string     `gorm:"type:varchar(255);" json:"Location" yaml:"Location,omitempty"`
 	AlbumCategory    string     `gorm:"type:varchar(255);index;" json:"Category" yaml:"Category,omitempty"`
 	AlbumCaption     string     `gorm:"type:text;" json:"Caption" yaml:"Caption,omitempty"`
 	AlbumDescription string     `gorm:"type:text;" json:"Description" yaml:"Description,omitempty"`
@@ -35,9 +44,9 @@ type Album struct {
 	AlbumCountry     string     `gorm:"type:varbinary(2);index:idx_albums_country_year_month;default:'zz'" json:"Country" yaml:"Country,omitempty"`
 	AlbumYear        int        `gorm:"index:idx_albums_country_year_month;" json:"Year" yaml:"Year,omitempty"`
 	AlbumMonth       int        `gorm:"index:idx_albums_country_year_month;" json:"Month" yaml:"Month,omitempty"`
+	AlbumDay         int        `json:"Day" yaml:"Day,omitempty"`
 	AlbumFavorite    bool       `json:"Favorite" yaml:"Favorite,omitempty"`
 	AlbumPrivate     bool       `json:"Private" yaml:"Private,omitempty"`
-	Links            []Link     `gorm:"foreignkey:share_uid;association_foreignkey:album_uid" json:"Links" yaml:"-"`
 	CreatedAt        time.Time  `json:"CreatedAt" yaml:"-"`
 	UpdatedAt        time.Time  `json:"UpdatedAt" yaml:"-"`
 	DeletedAt        *time.Time `sql:"index" json:"-" yaml:"-"`
@@ -65,7 +74,7 @@ func AddPhotoToAlbums(photo string, albums []string) (err error) {
 		if rnd.IsPPID(album, 'a') {
 			aUID = album
 		} else {
-			a := NewAlbum(album, TypeAlbum)
+			a := NewAlbum(album, AlbumDefault)
 
 			if err = a.Find(); err == nil {
 				aUID = a.AlbumUID
@@ -90,10 +99,10 @@ func AddPhotoToAlbums(photo string, albums []string) (err error) {
 
 // NewAlbum creates a new album; default name is current month and year
 func NewAlbum(albumTitle, albumType string) *Album {
-	now := time.Now().UTC()
+	now := Timestamp()
 
 	if albumType == "" {
-		albumType = TypeAlbum
+		albumType = AlbumDefault
 	}
 
 	result := &Album{
@@ -114,11 +123,11 @@ func NewFolderAlbum(albumTitle, albumSlug, albumFilter string) *Album {
 		return nil
 	}
 
-	now := time.Now().UTC()
+	now := Timestamp()
 
 	result := &Album{
-		AlbumOrder:  SortOrderOldest,
-		AlbumType:   TypeFolder,
+		AlbumOrder:  SortOrderAdded,
+		AlbumType:   AlbumFolder,
 		AlbumTitle:  albumTitle,
 		AlbumSlug:   albumSlug,
 		AlbumFilter: albumFilter,
@@ -135,11 +144,32 @@ func NewMomentsAlbum(albumTitle, albumSlug, albumFilter string) *Album {
 		return nil
 	}
 
-	now := time.Now().UTC()
+	now := Timestamp()
 
 	result := &Album{
 		AlbumOrder:  SortOrderOldest,
-		AlbumType:   TypeMoment,
+		AlbumType:   AlbumMoment,
+		AlbumTitle:  albumTitle,
+		AlbumSlug:   albumSlug,
+		AlbumFilter: albumFilter,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	return result
+}
+
+// NewStateAlbum creates a new moment.
+func NewStateAlbum(albumTitle, albumSlug, albumFilter string) *Album {
+	if albumTitle == "" || albumSlug == "" || albumFilter == "" {
+		return nil
+	}
+
+	now := Timestamp()
+
+	result := &Album{
+		AlbumOrder:  SortOrderNewest,
+		AlbumType:   AlbumState,
 		AlbumTitle:  albumTitle,
 		AlbumSlug:   albumSlug,
 		AlbumFilter: albumFilter,
@@ -162,11 +192,11 @@ func NewMonthAlbum(albumTitle, albumSlug string, year, month int) *Album {
 		Public: true,
 	}
 
-	now := time.Now().UTC()
+	now := Timestamp()
 
 	result := &Album{
 		AlbumOrder:  SortOrderOldest,
-		AlbumType:   TypeMonth,
+		AlbumType:   AlbumMonth,
 		AlbumTitle:  albumTitle,
 		AlbumSlug:   albumSlug,
 		AlbumFilter: f.Serialize(),
@@ -190,10 +220,9 @@ func FindAlbumBySlug(slug, albumType string) *Album {
 	return &result
 }
 
-// Find updates the entity with values from the database.
+// Find returns an entity from the database.
 func (m *Album) Find() error {
 	if rnd.IsPPID(m.AlbumUID, 'a') {
-		log.Debugf("IS PPID: %s", m.AlbumUID)
 		if err := UnscopedDb().First(m, "album_uid = ?", m.AlbumUID).Error; err != nil {
 			return err
 		}
@@ -234,7 +263,7 @@ func (m *Album) String() string {
 
 // Checks if the album is of type moment.
 func (m *Album) IsMoment() bool {
-	return m.AlbumType == TypeMoment
+	return m.AlbumType == AlbumMoment
 }
 
 // SetTitle changes the album name.
@@ -247,7 +276,7 @@ func (m *Album) SetTitle(title string) {
 
 	m.AlbumTitle = txt.Clip(title, txt.ClipDefault)
 
-	if m.AlbumType == TypeAlbum {
+	if m.AlbumType == AlbumDefault {
 		if len(m.AlbumTitle) < txt.ClipSlug {
 			m.AlbumSlug = slug.Make(m.AlbumTitle)
 		} else {
@@ -290,13 +319,13 @@ func (m *Album) Create() error {
 	}
 
 	switch m.AlbumType {
-	case TypeAlbum:
+	case AlbumDefault:
 		event.Publish("count.albums", event.Data{"count": 1})
-	case TypeMoment:
+	case AlbumMoment:
 		event.Publish("count.moments", event.Data{"count": 1})
-	case TypeMonth:
+	case AlbumMonth:
 		event.Publish("count.months", event.Data{"count": 1})
-	case TypeFolder:
+	case AlbumFolder:
 		event.Publish("count.folders", event.Data{"count": 1})
 	}
 	return nil
@@ -335,4 +364,9 @@ func (m *Album) RemovePhotos(UIDs []string) (removed []PhotoAlbum) {
 	}
 
 	return removed
+}
+
+// Links returns all share links for this entity.
+func (m *Album) Links() Links {
+	return FindLinks("", m.AlbumUID)
 }

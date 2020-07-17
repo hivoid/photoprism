@@ -33,6 +33,13 @@ func TestFirstOrCreateCountry(t *testing.T) {
 			t.Fatal("country should not be nil")
 		}
 	})
+	t.Run("de", func(t *testing.T) {
+		country := &Country{ID: "de"}
+		r := FirstOrCreateCountry(country)
+		if r == nil {
+			t.Fatal("country should not be nil")
+		}
+	})
 }
 
 func TestCountry_Name(t *testing.T) {

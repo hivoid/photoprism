@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,11 +31,13 @@ type Config struct {
 }
 
 func init() {
-	// initialize the Thumbnails global variable
-	for name, t := range thumb.Types {
+	// Init public thumb sizes for use in client apps.
+	for i := len(thumb.DefaultTypes) - 1; i >= 0; i-- {
+		size := thumb.DefaultTypes[i]
+		t := thumb.Types[size]
+
 		if t.Public {
-			thumbnail := Thumbnail{Name: name, Width: t.Width, Height: t.Height}
-			Thumbnails = append(Thumbnails, thumbnail)
+			Thumbs = append(Thumbs, Thumb{Size: size, Use: t.Use, Width: t.Width, Height: t.Height})
 		}
 	}
 }
@@ -73,7 +76,7 @@ func (c *Config) Propagate() {
 	log.SetLevel(c.LogLevel())
 
 	thumb.Size = c.ThumbSize()
-	thumb.Limit = c.ThumbLimit()
+	thumb.Limit = c.ThumbSizeUncached()
 	thumb.Filter = c.ThumbFilter()
 	thumb.JpegQuality = c.JpegQuality()
 
@@ -83,7 +86,7 @@ func (c *Config) Propagate() {
 // Init initialises the database connection and dependencies.
 func (c *Config) Init(ctx context.Context) error {
 	c.Propagate()
-	return c.connectToDatabase(ctx)
+	return c.connectDb()
 }
 
 // Name returns the application name ("PhotoPrism").
@@ -108,6 +111,19 @@ func (c *Config) SiteUrl() string {
 	}
 
 	return c.params.SiteUrl
+}
+
+// SitePreview returns the site preview image URL for sharing.
+func (c *Config) SitePreview() string {
+	if c.params.SitePreview == "" {
+		return c.SiteUrl() + "static/img/preview.jpg"
+	}
+
+	if !strings.HasPrefix(c.params.SitePreview, "http") {
+		return c.SiteUrl() + c.params.SitePreview
+	}
+
+	return c.params.SitePreview
 }
 
 // SiteTitle returns the main site title (default is application name).
@@ -164,18 +180,9 @@ func (c *Config) UploadNSFW() bool {
 	return c.params.UploadNSFW
 }
 
-// AdminPassword returns the admin password.
+// AdminPassword returns the initial admin password.
 func (c *Config) AdminPassword() string {
-	if c.params.AdminPassword == "" {
-		return "photoprism"
-	}
-
 	return c.params.AdminPassword
-}
-
-// WebDAVPassword returns the WebDAV password for remote access.
-func (c *Config) WebDAVPassword() string {
-	return c.params.WebDAVPassword
 }
 
 // LogLevel returns the logrus log level.
@@ -196,7 +203,7 @@ func (c *Config) Shutdown() {
 	mutex.MainWorker.Cancel()
 	mutex.ShareWorker.Cancel()
 	mutex.SyncWorker.Cancel()
-	mutex.PrismWorker.Cancel()
+	mutex.MetaWorker.Cancel()
 
 	if err := c.CloseDb(); err != nil {
 		log.Errorf("could not close database connection: %s", err)

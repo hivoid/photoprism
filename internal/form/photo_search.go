@@ -16,8 +16,11 @@ type PhotoSearch struct {
 	Original  string    `form:"original"`
 	Title     string    `form:"title"`
 	Hash      string    `form:"hash"`
+	Primary   bool      `form:"primary"`
 	Video     bool      `form:"video"`
 	Photo     bool      `form:"photo"`
+	Scan      bool      `form:"scan"`
+	Panorama  bool      `form:"panorama"`
 	Duplicate bool      `form:"duplicate"`
 	Error     bool      `form:"error"`
 	Hidden    bool      `form:"hidden"`
@@ -25,7 +28,8 @@ type PhotoSearch struct {
 	Public    bool      `form:"public"`
 	Private   bool      `form:"private"`
 	Favorite  bool      `form:"favorite"`
-	Safe      bool      `form:"safe"`
+	Unsorted  bool      `form:"unsorted"`
+	Stack     bool      `form:"stack"`
 	Lat       float32   `form:"lat"`
 	Lng       float32   `form:"lng"`
 	Dist      uint      `form:"dist"`
@@ -35,7 +39,7 @@ type PhotoSearch struct {
 	Diff      uint32    `form:"diff"`
 	Mono      bool      `form:"mono"`
 	Portrait  bool      `form:"portrait"`
-	Location  bool      `form:"location"`
+	Geo       bool      `form:"geo"`
 	Album     string    `form:"album"`
 	Label     string    `form:"label"`
 	Category  string    `form:"category"` // Moments
@@ -43,6 +47,7 @@ type PhotoSearch struct {
 	State     string    `form:"state"`    // Moments
 	Year      int       `form:"year"`     // Moments
 	Month     int       `form:"month"`    // Moments
+	Day       int       `form:"day"`      // Moments
 	Color     string    `form:"color"`
 	Quality   int       `form:"quality"`
 	Review    bool      `form:"review"`

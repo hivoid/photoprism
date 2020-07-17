@@ -10,14 +10,14 @@ AT:Salzburg
 AT:Klagenfurt
 AT:Innsbruck
 HU:Hungary
-GE:Republic of Georgia
+GE:Georgia Republic
 VA:Vatican City
 PL:Poland
 PL:Warsaw
 PL:Warschau
 KH:Cambodia
 LA:Vientiane
-LA:Lao People's Democratic Republic
+LA:Lao Republic
 VN:Vietnam
 DK:Denmark
 MM:Myanmar
@@ -26,7 +26,6 @@ CZ:Czech
 CH:Zurich
 CH:Zürich
 CH:St Gallen
-CH:St. Gallen
 CH:Basel
 CH:Lucerne
 CH:Luzern
@@ -56,29 +55,23 @@ GB:London
 GB:Scotland
 GB:Edinburgh
 GB:England
-GB:U.K.
-GB:Northern Ireland
-GB:Great Britain
-GB:Buckingham Palace
+GB:Britain
+GB:Buckingham
 IM:Isle of Man
 IE:Ireland
 IE:Dublin
-DE:Deutsche Demokratische
 DE:Deutschland
 DE:Germany
 DE:Aachen
 DE:Steglitz
 DE:Friedrichshain
 DE:Berghain
-DE:RAW Gelände
 DE:Bundestag
 DE:Grunewald
 DE:Charlottenburg
 DE:Wilmersdorf
 DE:Tempelhof
 DE:Schönefeld
-DE:Airport BER
-DE:Flughafen BER
 DE:Reichstag
 DE:Kreuzberg
 DE:Ostsee
@@ -92,8 +85,8 @@ DE:Stuttgart
 DE:Bisingen
 DE:Balingen
 DE:Hechingen
-DE:Swabian Jura
-DE:Schwäbische Alb
+DE:Swabian
+DE:Schwäbische
 DE:Albtrauf
 DE:München
 DE:Württemberg
@@ -117,6 +110,8 @@ DE:Düsseldorf
 DE:Cologne
 DE:Saarland
 DE:Saarbrücken
+DE:Konstanz
+DE:Reichenau
 LV:Latvia
 LV:Lettland
 LT:Lithuania
@@ -134,9 +129,7 @@ ZA:Pretoria
 ZA:Kapstadt
 ZA:Johannesburg
 ZA:South Africa
-ZA:Republic of South Africa
 SZ:Eswatini
-SZ:Kingdom of Eswatini
 SZ:Swaziland
 RO:Romania
 EC:Ecuador
@@ -144,7 +137,6 @@ MX:Mexico
 CO:Colombia
 US:California
 US:Washington
-US:The White House
 US:New York
 US:NYC
 US:Florida
@@ -160,7 +152,7 @@ US:Dallas
 US:Houston
 US:Las Vegas
 US:Minneapolis
-US:Kansas City
+US:Kansas
 US:Wisconsin
 US:Michigan
 US:Illinois
@@ -174,8 +166,6 @@ US:Detroit
 US:Nevada
 US:Texas
 US:USA
-US:U.S.A.
-US:U.S.
 US:United States
 MN:Mongolia
 CL:Chile
@@ -192,19 +182,18 @@ BG:Bulgaria
 GR:Greece
 GR:Hellas
 KP:North Korea
-KP:Democratic People's Republic of Korea
 KP:DPRK
 KP:DPR Korea
 DZ:Algeria
 TN:Tunisia
 LY:Libya
 MR:Mauritania
-GM:The Gambia
+GM:Gambia
 SN:Senegal
-GW:Guinea-Bissau
+GW:Guinea Bissau
 SL:Sierra Leone
 GN:Guinea
-CI:Côte d'Ivoire
+CI:Ivory Coast
 LR:Liberia
 GH:Ghana
 TG:Togo
@@ -214,7 +203,7 @@ ML:Mali
 NE:Niger
 NG:Nigeria
 SD:Sudan
-CF:Central African Republic
+CF:Central African
 GQ:Equatorial Guinea
 GA:Gabon
 CG:Congo Brazzaville
@@ -282,16 +271,15 @@ TL:East Timor
 PK:Pakistan
 SA:Saudi Arabia
 KR:South Korea
-AE:United Arab Emirates
-AE:Emirates
+AE:United Arab
+AE:UAE
 CY:Cyprus
 DM:Dominica
 HT:Haiti
 HT:Hayti
 CU:Cuba
-PG:Papua New Guinea
+PG:New Guinea
 AM:Armenia
-AM:Republic of Armenia
 AZ:Azerbaijan
 MT:Malta
 IT:Italy
@@ -306,7 +294,6 @@ IT:Venezia
 IT:Venedig
 IT:Italien
 JE:Jersey Island
-JE:Bailiwick of Jersey
 BH:Bahrain
 JP:Japan
 JP:Tokyo
@@ -383,7 +370,6 @@ CA:Ontario
 CA:Alberta
 CA:Niagara Falls
 IL:Israel
-IL:State of Israel
 IL:Holy Land
 EG:Egypt
 EG:Ägypten
@@ -399,14 +385,9 @@ BW:Gaborone
 BW:Botswana
 BW:Botsuana
 SH:Saint Helena
-SH:Ascension
-SH:Tristan da Cunha
-GS:South Sandwich Island
-BM:Island of Bermuda
-BM:Islands of Bermuda
-BM:Bermuda Island
-IO:British Indian Ocean
-IO:British Indian Territory
+GS:Sandwich Island
+BM:Bermuda
+IO:British Indian
 TH:Thailand
 XK:Kosovo
 LS:Lesotho
@@ -423,19 +404,14 @@ FK:Falkland Island
 PN:Pitcairn Island
 TK:Tokelau
 TO:Tonga
-TO:Kingdom of Tonga
-FR:ile de la Reunion
-FR:Reunion Island
 FR:Réunion
-FR:Piton de la Fournaise
-FR:Piton des Neiges
 FR:Strassburg
 FR:Strasbourg
 FR:Straßburg
 FR:Paris
 NL:Netherlands
 NL:Holland
-TD:Republic of Chad
+TD:Chad
 BA:Bosnia
 BA:Herzegovina
 NO:Norway

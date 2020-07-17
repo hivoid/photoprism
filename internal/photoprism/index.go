@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -59,6 +60,12 @@ func (ind *Index) Cancel() {
 
 // Start indexes media files in the originals directory.
 func (ind *Index) Start(opt IndexOptions) map[string]bool {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("index: %s (panic)\nstack: %s", r, debug.Stack())
+		}
+	}()
+
 	done := make(map[string]bool)
 	originalsPath := ind.originalsPath()
 	optionsPath := filepath.Join(originalsPath, opt.Path)
@@ -73,13 +80,7 @@ func (ind *Index) Start(opt IndexOptions) map[string]bool {
 		return done
 	}
 
-	defer func() {
-		mutex.MainWorker.Stop()
-
-		if err := recover(); err != nil {
-			log.Errorf("index: %s [panic]", err)
-		}
-	}()
+	defer mutex.MainWorker.Stop()
 
 	if err := ind.tensorFlow.Init(); err != nil {
 		log.Errorf("index: %s", err.Error())
@@ -107,7 +108,7 @@ func (ind *Index) Start(opt IndexOptions) map[string]bool {
 	}
 
 	ignore.Log = func(fileName string) {
-		log.Infof(`index: ignored "%s"`, fs.Rel(fileName, originalsPath))
+		log.Infof(`index: ignored "%s"`, fs.RelName(fileName, originalsPath))
 	}
 
 	err := godirwalk.Walk(optionsPath, &godirwalk.Options{
@@ -120,8 +121,8 @@ func (ind *Index) Start(opt IndexOptions) map[string]bool {
 			isSymlink := info.IsSymlink()
 
 			if skip, result := fs.SkipWalk(fileName, isDir, isSymlink, done, ignore); skip {
-				if isDir && result != filepath.SkipDir {
-					folder := entity.NewFolder(entity.RootOriginals, fs.Rel(fileName, originalsPath), nil)
+				if (isSymlink || isDir) && result != filepath.SkipDir {
+					folder := entity.NewFolder(entity.RootOriginals, fs.RelName(fileName, originalsPath), nil)
 
 					if err := folder.Create(); err == nil {
 						log.Infof("index: added folder /%s", folder.Path)
@@ -137,7 +138,7 @@ func (ind *Index) Start(opt IndexOptions) map[string]bool {
 				return nil
 			}
 
-			related, err := mf.RelatedFiles(ind.conf.Settings().Index.Group)
+			related, err := mf.RelatedFiles(ind.conf.Settings().Index.Sequences)
 
 			if err != nil {
 				log.Warnf("index: %s", err.Error())
@@ -189,4 +190,27 @@ func (ind *Index) Start(opt IndexOptions) map[string]bool {
 	runtime.GC()
 
 	return done
+}
+
+// File indexes a single file and returns the result.
+func (ind *Index) File(name string) (result IndexResult) {
+	file, err := NewMediaFile(name)
+
+	if err != nil {
+		result.Err = err
+		result.Status = IndexFailed
+
+		return result
+	}
+
+	related, err := file.RelatedFiles(false)
+
+	if err != nil {
+		result.Err = err
+		result.Status = IndexFailed
+
+		return result
+	}
+
+	return IndexRelated(related, ind, IndexOptionsAll())
 }

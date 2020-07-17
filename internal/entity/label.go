@@ -16,7 +16,7 @@ type Labels []Label
 // Label is used for photo, album and location categorization
 type Label struct {
 	ID               uint       `gorm:"primary_key" json:"ID" yaml:"-"`
-	LabelUID         string     `gorm:"type:varbinary(36);unique_index;" json:"UID" yaml:"UID"`
+	LabelUID         string     `gorm:"type:varbinary(42);unique_index;" json:"UID" yaml:"UID"`
 	LabelSlug        string     `gorm:"type:varbinary(255);unique_index;" json:"Slug" yaml:"-"`
 	CustomSlug       string     `gorm:"type:varbinary(255);index;" json:"CustomSlug" yaml:"-"`
 	LabelName        string     `gorm:"type:varchar(255);" json:"Name" yaml:"Name"`
@@ -25,7 +25,6 @@ type Label struct {
 	LabelDescription string     `gorm:"type:text;" json:"Description" yaml:"Description,omitempty"`
 	LabelNotes       string     `gorm:"type:text;" json:"Notes" yaml:"Notes,omitempty"`
 	LabelCategories  []*Label   `gorm:"many2many:categories;association_jointable_foreignkey:category_id" json:"-" yaml:"-"`
-	Links            []Link     `gorm:"foreignkey:share_uid;association_foreignkey:label_uid" json:"Links" yaml:"-"`
 	PhotoCount       int        `gorm:"default:1" json:"PhotoCount" yaml:"-"`
 	CreatedAt        time.Time  `json:"CreatedAt" yaml:"-"`
 	UpdatedAt        time.Time  `json:"UpdatedAt" yaml:"-"`
@@ -106,20 +105,23 @@ func FirstOrCreateLabel(m *Label) *Label {
 
 	if err := UnscopedDb().Where("label_slug = ? OR custom_slug = ?", m.LabelSlug, m.CustomSlug).First(&result).Error; err == nil {
 		return &result
-	} else if err := m.Create(); err != nil {
-		log.Errorf("label: %s", err)
-		return nil
+	} else if createErr := m.Create(); createErr == nil {
+		if m.LabelPriority >= 0 {
+			event.EntitiesCreated("labels", []*Label{m})
+
+			event.Publish("count.labels", event.Data{
+				"count": 1,
+			})
+		}
+
+		return m
+	} else if err := UnscopedDb().Where("label_slug = ? OR custom_slug = ?", m.LabelSlug, m.CustomSlug).First(&result).Error; err == nil {
+		return &result
+	} else {
+		log.Errorf("label: %s (first or create %s)", createErr, m.LabelSlug)
 	}
 
-	if m.LabelPriority >= 0 {
-		event.EntitiesCreated("labels", []*Label{m})
-
-		event.Publish("count.labels", event.Data{
-			"count": 1,
-		})
-	}
-
-	return m
+	return nil
 }
 
 // FindLabel returns an existing row if exists.
@@ -200,4 +202,9 @@ func (m *Label) UpdateClassify(label classify.Label) error {
 	}
 
 	return nil
+}
+
+// Links returns all share links for this entity.
+func (m *Label) Links() Links {
+	return FindLinks("", m.LabelUID)
 }

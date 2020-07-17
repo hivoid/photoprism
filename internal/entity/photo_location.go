@@ -62,7 +62,7 @@ func (m *Photo) GetTakenAt() time.Time {
 // UpdateLocation updates location and labels based on latitude and longitude.
 func (m *Photo) UpdateLocation(geoApi string) (keywords []string, labels classify.Labels) {
 	if m.HasLatLng() {
-		var location = NewLocation(m.PhotoLat, m.PhotoLng)
+		var location = NewCell(m.PhotoLat, m.PhotoLng)
 
 		err := location.Find(geoApi)
 
@@ -71,8 +71,8 @@ func (m *Photo) UpdateLocation(geoApi string) (keywords []string, labels classif
 		}
 
 		if err == nil && location.Place != nil && location.ID != UnknownLocation.ID {
-			m.Location = location
-			m.LocationID = location.ID
+			m.Cell = location
+			m.CellID = location.ID
 			m.Place = location.Place
 			m.PlaceID = location.PlaceID
 			m.PhotoCountry = location.CountryCode()
@@ -100,11 +100,11 @@ func (m *Photo) UpdateLocation(geoApi string) (keywords []string, labels classif
 	labels = classify.Labels{}
 
 	if m.UnknownLocation() {
-		m.Location = &UnknownLocation
-		m.LocationID = UnknownLocation.ID
+		m.Cell = &UnknownLocation
+		m.CellID = UnknownLocation.ID
 	} else if err := m.LoadLocation(); err == nil {
-		m.Place = m.Location.Place
-		m.PlaceID = m.Location.PlaceID
+		m.Place = m.Cell.Place
+		m.PlaceID = m.Cell.PlaceID
 	} else {
 		log.Warn(err)
 	}

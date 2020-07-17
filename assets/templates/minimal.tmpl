@@ -7,9 +7,7 @@
 
   <title>{{ .config.SiteTitle }}</title>
 
-  <link rel="shortcut icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" href="/static/favicons/favicon.png">
-  <link rel="icon" type="image/png" href="/static/favicons/favicon.png"/>
+  {{template "favicons.tmpl" .}}
 
   <link rel="stylesheet" href="/static/build/app.css?{{ .config.CSSHash }}">
   <link rel="manifest" href="/static/manifest.json">
@@ -24,12 +22,7 @@
   your browser</a> to improve your experience.</p>
 <![endif]-->
 
-<div id="photoprism" class="container">
-  <div class="loading rainbow">
-  </div>
-</div>
-
-<div id="p-busy-overlay"></div>
+{{template "app.tmpl" .}}
 
 <script src="/static/build/app.js?{{ .config.JSHash }}"></script>
 </body>

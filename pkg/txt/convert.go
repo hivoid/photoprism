@@ -13,6 +13,9 @@ var DatePathRegexp = regexp.MustCompile("\\D\\d{4}/\\d{1,2}/?\\d*")
 var DateTimeRegexp = regexp.MustCompile("\\D\\d{4}[\\-_]\\d{2}[\\-_]\\d{2}.{1,4}\\d{2}\\D\\d{2}\\D\\d{2,}")
 var DateIntRegexp = regexp.MustCompile("\\d{1,4}")
 var YearRegexp = regexp.MustCompile("\\d{4,5}")
+var CountryWordsRegexp = regexp.MustCompile("[\\p{L}]{2,}")
+var IsDateRegexp = regexp.MustCompile("\\d{4}[\\-_]?\\d{2}[\\-_]?\\d{2}")
+var IsDateTimeRegexp = regexp.MustCompile("\\d{4}[\\-_]?\\d{2}[\\-_]?\\d{2}.{1,4}\\d{2}\\D?\\d{2}\\D?\\d{2}")
 
 var (
 	YearMin = 1990
@@ -35,7 +38,7 @@ const (
 // Time returns a string as time or the zero time instant in case it can not be converted.
 func Time(s string) (result time.Time) {
 	defer func() {
-		if err := recover(); err != nil {
+		if r := recover(); r != nil {
 			result = time.Time{}
 		}
 	}()
@@ -150,6 +153,19 @@ func Time(s string) (result time.Time) {
 	return result.UTC()
 }
 
+// IsTime tests if the string looks like a date and/or time.
+func IsTime(s string) bool {
+	if s == "" {
+		return false
+	} else if m := IsDateRegexp.FindString(s); m == s {
+		return true
+	} else if m := IsDateTimeRegexp.FindString(s); m == s {
+		return true
+	}
+
+	return false
+}
+
 // Int returns a string as int or 0 if it can not be converted.
 func Int(s string) int {
 	if s == "" {
@@ -186,13 +202,20 @@ func CountryCode(s string) string {
 		return "zz"
 	}
 
-	r := strings.NewReplacer("--", " / ", "_", " ", "-", " ")
-	s = r.Replace(s)
-	s = strings.ToLower(s)
-	s = strings.ReplaceAll(s, "  ", " ")
+	words := CountryWordsRegexp.FindAllString(s, -1)
 
-	for keyword, code := range Countries {
-		if strings.Contains(s, keyword) {
+	for i, w := range words {
+		if i < len(words)-1 {
+			search := strings.ToLower(w + " " + words[i+1])
+
+			if code, ok := Countries[search]; ok {
+				return code
+			}
+		}
+
+		search := strings.ToLower(w)
+
+		if code, ok := Countries[search]; ok {
 			return code
 		}
 	}

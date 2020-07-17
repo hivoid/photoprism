@@ -85,8 +85,8 @@ func (c *Config) CreateDirectories() error {
 		return createError(c.TensorFlowModelPath(), err)
 	}
 
-	if err := os.MkdirAll(c.StaticBuildPath(), os.ModePerm); err != nil {
-		return createError(c.StaticBuildPath(), err)
+	if err := os.MkdirAll(c.BuildPath(), os.ModePerm); err != nil {
+		return createError(c.BuildPath(), err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(c.PIDFilename()), os.ModePerm); err != nil {
@@ -164,11 +164,6 @@ func (c *Config) ImportPath() string {
 // SipsBin returns the sips executable file name.
 func (c *Config) SipsBin() string {
 	return findExecutable(c.params.SipsBin, "sips")
-}
-
-// DarktableBin returns the darktable-cli executable file name.
-func (c *Config) DarktableBin() string {
-	return findExecutable(c.params.DarktableBin, "darktable-cli")
 }
 
 // ExifToolBin returns the exiftool executable file name.
@@ -281,6 +276,11 @@ func (c *Config) StoragePath() string {
 // AssetsPath returns the path to static assets.
 func (c *Config) AssetsPath() string {
 	return fs.Abs(c.params.AssetsPath)
+}
+
+// LocalesPath returns the translation locales path.
+func (c *Config) LocalesPath() string {
+	return filepath.Join(c.AssetsPath(), "locales")
 }
 
 // ExamplesPath returns the example files path.

@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/photoprism/photoprism/internal/config"
+	"github.com/photoprism/photoprism/internal/acl"
 	"github.com/photoprism/photoprism/internal/entity"
 	"github.com/photoprism/photoprism/internal/query"
 	"github.com/photoprism/photoprism/pkg/txt"
@@ -16,10 +16,12 @@ import (
 )
 
 // GET /api/v1/geo
-func GetGeo(router *gin.RouterGroup, conf *config.Config) {
+func GetGeo(router *gin.RouterGroup) {
 	router.GET("/geo", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionSearch)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
@@ -28,7 +30,7 @@ func GetGeo(router *gin.RouterGroup, conf *config.Config) {
 		err := c.MustBindWith(&f, binding.Form)
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": txt.UcFirst(err.Error())})
+			AbortBadRequest(c)
 			return
 		}
 

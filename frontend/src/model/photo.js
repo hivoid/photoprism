@@ -1,9 +1,41 @@
+/*
+
+Copyright (c) 2018 - 2020 Michael Mayer <hello@photoprism.org>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+    PhotoPrism™ is a registered trademark of Michael Mayer.  You may use it as required
+    to describe our software, run your own server, for educational purposes, but not for
+    offering commercial goods, products, or services without prior written permission.
+    In other words, please ask.
+
+Feel free to send an e-mail to hello@photoprism.org if you have questions,
+want to support our work, or just want to say hello.
+
+Additional information can be found in our Developer Guide:
+https://docs.photoprism.org/developer-guide/
+
+*/
+
 import RestModel from "model/rest";
+import File from "model/file";
 import Api from "common/api";
 import {DateTime} from "luxon";
 import Util from "common/util";
 import {config} from "../session";
-import countries from "resources/countries.json";
+import countries from "options/countries.json";
+import {$gettext} from "common/vm";
 
 export const SrcManual = "manual";
 export const CodecAvc1 = "avc1";
@@ -12,6 +44,7 @@ export const TypeJpeg = "jpg";
 export const TypeImage = "image";
 export const YearUnknown = -1;
 export const MonthUnknown = -1;
+export const DayUnknown = -1;
 
 export class Photo extends RestModel {
     getDefaults() {
@@ -19,8 +52,11 @@ export class Photo extends RestModel {
             DocumentID: "",
             UID: "",
             Type: TypeImage,
+            TypeSrc: "",
             Favorite: false,
             Private: false,
+            Scan: false,
+            Panorama: false,
             TakenAt: "",
             TakenAtLocal: "",
             TakenSrc: "",
@@ -28,6 +64,7 @@ export class Photo extends RestModel {
             Path: "",
             Color: "",
             Name: "",
+            OriginalName: "",
             Title: "",
             TitleSrc: "",
             Description: "",
@@ -44,12 +81,14 @@ export class Photo extends RestModel {
             Views: 0,
             Camera: {},
             CameraID: 0,
+            CameraSerial: "",
             CameraSrc: "",
             Lens: {},
             LensID: 0,
             Country: "",
             Year: YearUnknown,
             Month: MonthUnknown,
+            Day: DayUnknown,
             Details: {
                 Keywords: "",
                 Notes: "",
@@ -62,17 +101,17 @@ export class Photo extends RestModel {
             Labels: [],
             Keywords: [],
             Albums: [],
-            Links: [],
-            Location: {},
+            Cell: {},
+            CellID: "",
+            CellAccuracy: 0,
             Place: {},
             PlaceID: "",
-            LocationID: "",
-            LocSrc: "",
+            PlaceSrc: "",
             // Additional data in result lists.
-            LocLabel: "",
-            LocCity: "",
-            LocState: "",
-            LocCountry: "",
+            PlaceLabel: "",
+            PlaceCity: "",
+            PlaceState: "",
+            PlaceCountry: "",
             FileUID: "",
             FileRoot: "",
             FileName: "",
@@ -82,15 +121,89 @@ export class Photo extends RestModel {
             // Date fields.
             CreatedAt: "",
             UpdatedAt: "",
+            EditedAt: null,
+            CheckedAt: null,
             DeletedAt: null,
         };
+    }
+
+    localDayString() {
+        if (!this.TakenAtLocal) {
+            return new Date().getDay().toString().padStart(2, "0");
+        }
+
+        if (!this.Day || this.Day <= 0) {
+            return this.TakenAtLocal.substr(8, 2);
+        }
+
+        return this.Day.toString().padStart(2, "0");
+    }
+
+    localMonthString() {
+        if (!this.TakenAtLocal) {
+            return new Date().getMonth().toString().padStart(2, "0");
+        }
+
+        if (!this.Month || this.Month <= 0) {
+            return this.TakenAtLocal.substr(5, 2);
+        }
+
+        return this.Month.toString().padStart(2, "0");
+    }
+
+    localYearString() {
+        if (!this.TakenAtLocal) {
+            return new Date().getFullYear().toString().padStart(4, "0");
+        }
+
+        if (!this.Year || this.Year <= 1000) {
+            return this.TakenAtLocal.substr(0, 4);
+        }
+
+        return this.Year.toString();
+    }
+
+    localDateString(time) {
+        if (!this.localYearString()) {
+            return this.TakenAtLocal;
+        }
+
+        let date = this.localYearString() + "-" + this.localMonthString() + "-" + this.localDayString();
+
+        if (!time) {
+            time = this.TakenAtLocal.substr(11, 8);
+        }
+
+        return `${date}T${time}`;
+    }
+
+    getTimeZone() {
+        if (this.TimeZone) {
+            return this.TimeZone;
+        }
+
+        return "utc";
+    }
+
+    localDate(time) {
+        if(!this.TakenAtLocal) {
+            return this.utcDate();
+        }
+
+        let zone = this.getTimeZone();
+
+        return DateTime.fromISO(this.localDateString(time), {zone});
+    }
+
+    utcDate() {
+        return DateTime.fromISO(this.TakenAt).toUTC();
     }
 
     baseName(truncate) {
         let result = this.fileBase(this.FileName ? this.FileName : this.mainFile().Name);
 
         if (truncate) {
-            result = Util.truncate(result, truncate, "...");
+            result = Util.truncate(result, truncate, "…");
         }
 
         return result;
@@ -109,10 +222,6 @@ export class Photo extends RestModel {
 
     getEntityName() {
         return this.Title;
-    }
-
-    getId() {
-        return this.UID;
     }
 
     getTitle() {
@@ -199,20 +308,44 @@ export class Photo extends RestModel {
         return "";
     }
 
-    thumbnailUrl(type) {
+    fileModels() {
+        let result = [];
+
+        if (!this.Files) {
+            return result;
+        }
+
+        this.Files.forEach((f) => {
+            result.push(new File(f));
+        });
+
+        result.sort((a, b) => {
+            if (a.Primary > b.Primary) {
+                return -1;
+            } else if (a.Primary < b.Primary) {
+                return 1;
+            }
+
+            return a.Name.localeCompare(b.Name);
+        });
+
+        return result;
+    }
+
+    thumbnailUrl(size) {
         let hash = this.mainFileHash();
 
         if (!hash) {
             let video = this.videoFile();
 
             if (video && video.Hash) {
-                return `/api/v1/t/${video.Hash}/${config.previewToken()}/${type}`;
+                return `/api/v1/t/${video.Hash}/${config.previewToken()}/${size}`;
             }
 
             return "/api/v1/svg/photo";
         }
 
-        return `/api/v1/t/${hash}/${config.previewToken()}/${type}`;
+        return `/api/v1/t/${hash}/${config.previewToken()}/${size}`;
     }
 
     getDownloadUrl() {
@@ -241,18 +374,6 @@ export class Photo extends RestModel {
         });
     }
 
-    thumbnailSrcset() {
-        const result = [];
-
-        result.push(this.thumbnailUrl("fit_720") + " 720w");
-        result.push(this.thumbnailUrl("fit_1280") + " 1280w");
-        result.push(this.thumbnailUrl("fit_1920") + " 1920w");
-        result.push(this.thumbnailUrl("fit_2560") + " 2560w");
-        result.push(this.thumbnailUrl("fit_3840") + " 3840w");
-
-        return result.join(", ");
-    }
-
     calculateSize(width, height) {
         if (width >= this.Width && height >= this.Height) { // Smaller
             return {width: this.Width, height: this.Height};
@@ -275,57 +396,60 @@ export class Photo extends RestModel {
         return {width: newW, height: newH};
     }
 
-    thumbnailSizes() {
-        const result = [];
-
-        result.push("(min-width: 2560px) 3840px");
-        result.push("(min-width: 1920px) 2560px");
-        result.push("(min-width: 1280px) 1920px");
-        result.push("(min-width: 720px) 1280px");
-        result.push("720px");
-
-        return result.join(", ");
-    }
-
     getDateString() {
         if (!this.TakenAt || this.Year === YearUnknown) {
-            return "Unknown";
+            return $gettext("Unknown");
+        } else if (this.Month === MonthUnknown) {
+            return this.localYearString();
+        } else if (this.Day === DayUnknown) {
+            return this.localDate().toLocaleString({month: "long", year: "numeric"});
+        } else if (this.TimeZone) {
+            return this.localDate().toLocaleString(DateTime.DATETIME_FULL);
         }
 
-        if (this.TimeZone) {
-            return DateTime.fromISO(this.TakenAt).setZone(this.TimeZone).toLocaleString(DateTime.DATETIME_FULL);
-        }
-
-        return DateTime.fromISO(this.TakenAt).setZone("UTC").toLocaleString(DateTime.DATE_HUGE);
+        return this.localDate().toLocaleString(DateTime.DATE_HUGE);
     }
 
     shortDateString() {
         if (!this.TakenAt || this.Year === YearUnknown) {
-            return "Unknown";
+            return $gettext("Unknown");
+        } else if (this.Month === MonthUnknown) {
+            return this.localYearString();
+        } else if (this.Day === DayUnknown) {
+            return this.localDate().toLocaleString({month: "long", year: "numeric"});
         }
 
-
-        if (this.TimeZone) {
-            return DateTime.fromISO(this.TakenAt).setZone(this.TimeZone).toLocaleString(DateTime.DATE_MED);
-        }
-
-        return DateTime.fromISO(this.TakenAt).setZone("UTC").toLocaleString(DateTime.DATE_MED);
+        return this.localDate().toLocaleString(DateTime.DATE_MED);
     }
 
     hasLocation() {
         return this.Lat !== 0 || this.Lng !== 0;
     }
 
-    locationInfo() {
-        if (this.PlaceID === "zz" && this.Country !== "zz") {
+    countryName() {
+        if (this.Country !== "zz") {
             const country = countries.find(c => c.Code === this.Country);
 
-            if(country) {
+            if (country) {
                 return country.Name;
             }
         }
 
-        return this.LocLabel ? this.LocLabel : "Unknown";
+        return $gettext("Unknown");
+    }
+
+    locationInfo() {
+        if (this.PlaceID === "zz" && this.Country !== "zz") {
+            const country = countries.find(c => c.Code === this.Country);
+
+            if (country) {
+                return country.Name;
+            }
+        } else if (this.Place && this.Place.Label) {
+            return this.Place.Label;
+        }
+
+        return this.PlaceLabel ? this.PlaceLabel : $gettext("Unknown");
     }
 
     addSizeInfo(file, info) {
@@ -362,7 +486,7 @@ export class Photo extends RestModel {
         }
 
         if (!file) {
-            return "Video";
+            return $gettext("Video");
         }
 
         if (file.Duration > 0) {
@@ -375,8 +499,8 @@ export class Photo extends RestModel {
 
         this.addSizeInfo(file, info);
 
-        if (!info) {
-            return "Video";
+        if (!info.length) {
+            return $gettext("Video");
         }
 
         return info.join(", ");
@@ -391,12 +515,18 @@ export class Photo extends RestModel {
             info.push(this.CameraMake + " " + this.CameraModel);
         }
 
-        let file = this.mainFile();
+        let file = this.videoFile();
+
+        if (!file || !file.Width) {
+            file = this.mainFile();
+        } else if (file.Codec) {
+            info.push(file.Codec.toUpperCase());
+        }
 
         this.addSizeInfo(file, info);
 
-        if (!info) {
-            return "Unknown";
+        if (!info.length) {
+            return $gettext("Unknown");
         }
 
         return info.join(", ");
@@ -409,7 +539,15 @@ export class Photo extends RestModel {
             return this.CameraMake + " " + this.CameraModel;
         }
 
-        return "Unknown";
+        return $gettext("Unknown");
+    }
+
+    archive() {
+        return Api.post("batch/photos/archive", {"photos": [this.getId()]});
+    }
+
+    approve() {
+        return Api.post(this.getEntityResource() + "/approve");
     }
 
     toggleLike() {
@@ -428,8 +566,12 @@ export class Photo extends RestModel {
         return Api.put(this.getEntityResource(), {Private: this.Private});
     }
 
-    setPrimary(uid) {
-        return Api.post(this.getEntityResource() + "/primary/" + uid).then((r) => Promise.resolve(this.setValues(r.data)));
+    primaryFile(fileUID) {
+        return Api.post(`${this.getEntityResource()}/files/${fileUID}/primary`).then((r) => Promise.resolve(this.setValues(r.data)));
+    }
+
+    unstackFile(fileUID) {
+        return Api.post(`${this.getEntityResource()}/files/${fileUID}/unstack`).then((r) => Promise.resolve(this.setValues(r.data)));
     }
 
     like() {
@@ -469,15 +611,19 @@ export class Photo extends RestModel {
             values.TitleSrc = SrcManual;
         }
 
+        if (values.Type) {
+            values.TypeSrc = SrcManual;
+        }
+
         if (values.Description) {
             values.DescriptionSrc = SrcManual;
         }
 
         if (values.Lat || values.Lng || values.Country) {
-            values.LocSrc = SrcManual;
+            values.PlaceSrc = SrcManual;
         }
 
-        if (values.TakenAt || values.TimeZone) {
+        if (values.TakenAt || values.TimeZone || values.Day || values.Month || values.Year) {
             values.TakenSrc = SrcManual;
         }
 
@@ -485,7 +631,13 @@ export class Photo extends RestModel {
             values.CameraSrc = SrcManual;
         }
 
-        return Api.put(this.getEntityResource(), values).then((response) => Promise.resolve(this.setValues(response.data)));
+        return Api.put(this.getEntityResource(), values).then((resp) => {
+            if(values.Type || values.Lat) {
+                config.update();
+            }
+
+            return Promise.resolve(this.setValues(resp.data));
+        });
     }
 
     static getCollectionResource() {
@@ -493,7 +645,7 @@ export class Photo extends RestModel {
     }
 
     static getModelName() {
-        return "Photo";
+        return $gettext("Photo");
     }
 
     static mergeResponse(results, response) {

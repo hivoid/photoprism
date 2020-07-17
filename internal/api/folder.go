@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/photoprism/photoprism/internal/config"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/photoprism/photoprism/internal/acl"
 	"github.com/photoprism/photoprism/internal/entity"
+	"github.com/photoprism/photoprism/internal/form"
 	"github.com/photoprism/photoprism/internal/query"
 	"github.com/photoprism/photoprism/internal/service"
 )
@@ -24,18 +26,29 @@ type FoldersResponse struct {
 }
 
 // GetFolders is a reusable request handler for directory listings (GET /api/v1/folders/*).
-func GetFolders(router *gin.RouterGroup, conf *config.Config, urlPath, rootName, rootPath string) {
+func GetFolders(router *gin.RouterGroup, urlPath, rootName, rootPath string) {
 	handler := func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+		s := Auth(SessionID(c), acl.ResourceFolders, acl.ActionSearch)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
+		var f form.FolderSearch
+
 		start := time.Now()
+		err := c.MustBindWith(&f, binding.Form)
+
+		if err != nil {
+			AbortBadRequest(c)
+			return
+		}
+
 		cache := service.Cache()
-		recursive := c.Query("recursive") != ""
-		listFiles := c.Query("files") != ""
-		uncached := listFiles || c.Query("uncached") != ""
+		recursive := f.Recursive
+		listFiles := f.Files
+		uncached := listFiles || f.Uncached
 		resp := FoldersResponse{Root: rootName, Recursive: recursive, Cached: !uncached}
 		path := c.Param("path")
 
@@ -64,7 +77,7 @@ func GetFolders(router *gin.RouterGroup, conf *config.Config, urlPath, rootName,
 		}
 
 		if listFiles {
-			if files, err := query.FilesByPath(rootName, path); err != nil {
+			if files, err := query.FilesByPath(f.Count, f.Offset, rootName, path); err != nil {
 				log.Errorf("folders: %s", err)
 			} else {
 				resp.Files = files
@@ -78,8 +91,11 @@ func GetFolders(router *gin.RouterGroup, conf *config.Config, urlPath, rootName,
 			}
 		}
 
+		c.Header("X-Files", strconv.Itoa(len(resp.Files)))
+		c.Header("X-Folders", strconv.Itoa(len(resp.Folders)))
 		c.Header("X-Count", strconv.Itoa(len(resp.Files)+len(resp.Folders)))
-		c.Header("X-Offset", "0")
+		c.Header("X-Limit", strconv.Itoa(f.Count))
+		c.Header("X-Offset", strconv.Itoa(f.Offset))
 
 		c.JSON(http.StatusOK, resp)
 	}
@@ -89,11 +105,13 @@ func GetFolders(router *gin.RouterGroup, conf *config.Config, urlPath, rootName,
 }
 
 // GET /api/v1/folders/originals
-func GetFoldersOriginals(router *gin.RouterGroup, conf *config.Config) {
-	GetFolders(router, conf, "originals", entity.RootOriginals, conf.OriginalsPath())
+func GetFoldersOriginals(router *gin.RouterGroup) {
+	conf := service.Config()
+	GetFolders(router, "originals", entity.RootOriginals, conf.OriginalsPath())
 }
 
 // GET /api/v1/folders/import
-func GetFoldersImport(router *gin.RouterGroup, conf *config.Config) {
-	GetFolders(router, conf, "import", entity.RootImport, conf.ImportPath())
+func GetFoldersImport(router *gin.RouterGroup) {
+	conf := service.Config()
+	GetFolders(router, "import", entity.RootImport, conf.ImportPath())
 }

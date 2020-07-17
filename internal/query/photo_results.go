@@ -17,6 +17,7 @@ type PhotoResult struct {
 	UUID             string        `json:"DocumentID,omitempty"`
 	PhotoUID         string        `json:"UID"`
 	PhotoType        string        `json:"Type"`
+	TypeSrc          string        `json:"TypeSrc"`
 	TakenAt          time.Time     `json:"TakenAt"`
 	TakenAtLocal     time.Time     `json:"TakenAtLocal"`
 	TakenSrc         string        `json:"TakenSrc"`
@@ -28,30 +29,37 @@ type PhotoResult struct {
 	PhotoDescription string        `json:"Description"`
 	PhotoYear        int           `json:"Year"`
 	PhotoMonth       int           `json:"Month"`
+	PhotoDay         int           `json:"Day"`
 	PhotoCountry     string        `json:"Country"`
 	PhotoFavorite    bool          `json:"Favorite"`
 	PhotoPrivate     bool          `json:"Private"`
-	PhotoLat         float32       `json:"Lat"`
-	PhotoLng         float32       `json:"Lng"`
-	PhotoAltitude    int           `json:"Altitude"`
 	PhotoIso         int           `json:"Iso"`
 	PhotoFocalLength int           `json:"FocalLength"`
 	PhotoFNumber     float32       `json:"FNumber"`
 	PhotoExposure    string        `json:"Exposure"`
 	PhotoQuality     int           `json:"Quality"`
 	PhotoResolution  int           `json:"Resolution"`
+	PhotoScan        bool          `json:"Scan"`
+	PhotoPanorama    bool          `json:"Panorama"`
 	CameraID         uint          `json:"CameraID"` // Camera
+	CameraSerial     string        `json:"CameraSerial,omitempty"`
+	CameraSrc        string        `json:"CameraSrc,omitempty"`
 	CameraModel      string        `json:"CameraModel"`
 	CameraMake       string        `json:"CameraMake"`
 	LensID           uint          `json:"LensID"` // Lens
 	LensModel        string        `json:"LensModel"`
 	LensMake         string        `json:"LensMake"`
+	PhotoAltitude    int           `json:"Altitude,omitempty"`
+	PhotoLat         float32       `json:"Lat"`
+	PhotoLng         float32       `json:"Lng"`
+	CellID           string        `json:"CellID"` // Cell
+	CellAccuracy     int           `json:"CellAccuracy,omitempty"`
 	PlaceID          string        `json:"PlaceID"`
-	LocationID       string        `json:"LocationID"` // Location
-	LocLabel         string        `json:"LocLabel"`
-	LocCity          string        `json:"LocCity"`
-	LocState         string        `json:"LocState"`
-	LocCountry       string        `json:"LocCountry"`
+	PlaceSrc         string        `json:"PlaceSrc"`
+	PlaceLabel       string        `json:"PlaceLabel"`
+	PlaceCity        string        `json:"PlaceCity"`
+	PlaceState       string        `json:"PlaceState"`
+	PlaceCountry     string        `json:"PlaceCountry"`
 	FileID           uint          `json:"-"` // File
 	FileUID          string        `json:"FileUID"`
 	FileRoot         string        `json:"FileRoot"`
@@ -68,6 +76,7 @@ type PhotoResult struct {
 	FileMime         string        `json:"-"`
 	FileSize         int64         `json:"-"`
 	FileOrientation  int           `json:"-"`
+	FileProjection   string        `json:"-"`
 	FileAspectRatio  float32       `json:"-"`
 	FileColors       string        `json:"-"`
 	FileChroma       uint8         `json:"-"`
@@ -76,12 +85,25 @@ type PhotoResult struct {
 	Merged           bool          `json:"Merged"`
 	CreatedAt        time.Time     `json:"CreatedAt"`
 	UpdatedAt        time.Time     `json:"UpdatedAt"`
+	EditedAt         time.Time     `json:"EditedAt,omitempty"`
+	CheckedAt        time.Time     `json:"CheckedAt,omitempty"`
 	DeletedAt        time.Time     `json:"DeletedAt,omitempty"`
 
 	Files []entity.File `json:"Files"`
 }
 
 type PhotoResults []PhotoResult
+
+// UIDs returns a slice of photo UIDs.
+func (m PhotoResults) UIDs() []string {
+	result := make([]string, len(m))
+
+	for i, el := range m {
+		result[i] = el.PhotoUID
+	}
+
+	return result
+}
 
 func (m PhotoResults) Merged() (PhotoResults, int, error) {
 	count := len(m)

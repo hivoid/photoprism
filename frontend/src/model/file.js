@@ -1,8 +1,39 @@
+/*
+
+Copyright (c) 2018 - 2020 Michael Mayer <hello@photoprism.org>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+    PhotoPrism™ is a registered trademark of Michael Mayer.  You may use it as required
+    to describe our software, run your own server, for educational purposes, but not for
+    offering commercial goods, products, or services without prior written permission.
+    In other words, please ask.
+
+Feel free to send an e-mail to hello@photoprism.org if you have questions,
+want to support our work, or just want to say hello.
+
+Additional information can be found in our Developer Guide:
+https://docs.photoprism.org/developer-guide/
+
+*/
+
 import RestModel from "model/rest";
 import Api from "common/api";
 import {DateTime} from "luxon";
 import Util from "common/util";
 import {config} from "../session";
+import {$gettext} from "common/vm";
 
 export class File extends RestModel {
     getDefaults() {
@@ -29,6 +60,7 @@ export class File extends RestModel {
             Width: 0,
             Height: 0,
             Orientation: 0,
+            Projection: "",
             AspectRatio: 1.0,
             MainColor: "",
             Colors: "",
@@ -37,7 +69,6 @@ export class File extends RestModel {
             Chroma: 0,
             Notes: "",
             Error: "",
-            Links: [],
             CreatedAt: "",
             CreatedIn: 0,
             UpdatedAt: "",
@@ -54,8 +85,8 @@ export class File extends RestModel {
             result = this.Name.substring(slash + 1);
         }
 
-        if(truncate) {
-            result = Util.truncate(result, truncate, "...");
+        if (truncate) {
+            result = Util.truncate(result, truncate, "…");
         }
 
         return result;
@@ -69,34 +100,30 @@ export class File extends RestModel {
         return this.Root + "/" + this.Name;
     }
 
-    getId() {
-        return this.UID;
-    }
-
-    thumbnailUrl(type) {
-        if(this.Error) {
+    thumbnailUrl(size) {
+        if (this.Error) {
             return "/api/v1/svg/broken";
         } else if (this.Type === "raw") {
             return "/api/v1/svg/raw";
         }
 
-        return `/api/v1/t/${this.Hash}/${config.previewToken()}/${type}`;
+        return `/api/v1/t/${this.Hash}/${config.previewToken()}/${size}`;
     }
 
     getDownloadUrl() {
         return "/api/v1/dl/" + this.Hash + "?t=" + config.downloadToken();
     }
 
-    thumbnailSrcset() {
-        const result = [];
+    download() {
+        if (!this.Hash) {
+            console.warn("no file hash found for download", this);
+            return;
+        }
 
-        result.push(this.thumbnailUrl("fit_720") + " 720w");
-        result.push(this.thumbnailUrl("fit_1280") + " 1280w");
-        result.push(this.thumbnailUrl("fit_1920") + " 1920w");
-        result.push(this.thumbnailUrl("fit_2560") + " 2560w");
-        result.push(this.thumbnailUrl("fit_3840") + " 3840w");
-
-        return result.join(", ");
+        let link = document.createElement("a");
+        link.href = this.getDownloadUrl();
+        link.download = this.baseName(this.Name);
+        link.click();
     }
 
     calculateSize(width, height) {
@@ -121,18 +148,6 @@ export class File extends RestModel {
         return {width: newW, height: newH};
     }
 
-    thumbnailSizes() {
-        const result = [];
-
-        result.push("(min-width: 2560px) 3840px");
-        result.push("(min-width: 1920px) 2560px");
-        result.push("(min-width: 1280px) 1920px");
-        result.push("(min-width: 720px) 1280px");
-        result.push("720px");
-
-        return result.join(", ");
-    }
-
     getDateString() {
         return DateTime.fromISO(this.CreatedAt).toLocaleString(DateTime.DATETIME_MED);
     }
@@ -147,6 +162,24 @@ export class File extends RestModel {
         if (this.Duration > 0) {
             info.push(Util.duration(this.Duration));
         }
+
+        this.addSizeInfo(info);
+
+        return info.join(", ");
+    }
+
+    typeInfo() {
+        if (this.Video) {
+            return $gettext("Video");
+        } else if (this.Sidecar) {
+            return $gettext("Sidecar");
+        }
+
+        return this.Type.toUpperCase();
+    }
+
+    sizeInfo() {
+        let info = [];
 
         this.addSizeInfo(info);
 
@@ -198,7 +231,7 @@ export class File extends RestModel {
     }
 
     static getModelName() {
-        return "File";
+        return $gettext("File");
     }
 }
 

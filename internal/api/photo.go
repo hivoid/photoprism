@@ -5,18 +5,22 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/photoprism/photoprism/internal/config"
+	"github.com/photoprism/photoprism/internal/acl"
 	"github.com/photoprism/photoprism/internal/entity"
 	"github.com/photoprism/photoprism/internal/event"
 	"github.com/photoprism/photoprism/internal/form"
+	"github.com/photoprism/photoprism/internal/i18n"
 	"github.com/photoprism/photoprism/internal/photoprism"
 	"github.com/photoprism/photoprism/internal/query"
+	"github.com/photoprism/photoprism/internal/service"
 	"github.com/photoprism/photoprism/pkg/fs"
 	"github.com/photoprism/photoprism/pkg/txt"
 )
 
 // SavePhotoAsYaml saves photo data as YAML file.
-func SavePhotoAsYaml(p entity.Photo, conf *config.Config) {
+func SavePhotoAsYaml(p entity.Photo) {
+	conf := service.Config()
+
 	// Write YAML sidecar file (optional).
 	if conf.SidecarYaml() {
 		yamlFile := p.YamlFileName(conf.OriginalsPath(), conf.SidecarPath())
@@ -24,7 +28,7 @@ func SavePhotoAsYaml(p entity.Photo, conf *config.Config) {
 		if err := p.SaveAsYaml(yamlFile); err != nil {
 			log.Errorf("photo: %s (update yaml)", err)
 		} else {
-			log.Infof("photo: updated yaml file %s", txt.Quote(fs.Rel(yamlFile, conf.OriginalsPath())))
+			log.Infof("photo: updated yaml file %s", txt.Quote(fs.RelName(yamlFile, conf.OriginalsPath())))
 		}
 	}
 }
@@ -33,17 +37,19 @@ func SavePhotoAsYaml(p entity.Photo, conf *config.Config) {
 //
 // Parameters:
 //   uid: string PhotoUID as returned by the API
-func GetPhoto(router *gin.RouterGroup, conf *config.Config) {
+func GetPhoto(router *gin.RouterGroup) {
 	router.GET("/photos/:uid", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionRead)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
 		p, err := query.PhotoPreloadByUID(c.Param("uid"))
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			AbortEntityNotFound(c)
 			return
 		}
 
@@ -52,18 +58,21 @@ func GetPhoto(router *gin.RouterGroup, conf *config.Config) {
 }
 
 // PUT /api/v1/photos/:uid
-func UpdatePhoto(router *gin.RouterGroup, conf *config.Config) {
+func UpdatePhoto(router *gin.RouterGroup) {
 	router.PUT("/photos/:uid", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionUpdate)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
+		conf := service.Config()
 		uid := c.Param("uid")
 		m, err := query.PhotoByUID(uid)
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			AbortEntityNotFound(c)
 			return
 		}
 
@@ -72,37 +81,34 @@ func UpdatePhoto(router *gin.RouterGroup, conf *config.Config) {
 		f, err := form.NewPhoto(m)
 
 		if err != nil {
-			log.Errorf("photo: %s", err.Error())
-			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrSaveFailed)
+			Abort(c, http.StatusInternalServerError, i18n.ErrSaveFailed)
 			return
 		}
 
 		// 2) Update form with values from request
 		if err := c.BindJSON(&f); err != nil {
-			log.Errorf("photo: %s", err.Error())
-			c.AbortWithStatusJSON(http.StatusBadRequest, ErrFormInvalid)
+			Abort(c, http.StatusBadRequest, i18n.ErrBadRequest)
 			return
 		}
 
 		// 3) Save model with values from form
 		if err := entity.SavePhotoForm(m, f, conf.GeoCodingApi()); err != nil {
-			log.Error(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrSaveFailed)
+			Abort(c, http.StatusInternalServerError, i18n.ErrSaveFailed)
 			return
 		}
 
 		PublishPhotoEvent(EntityUpdated, uid, c)
 
-		event.Success("photo saved")
+		event.SuccessMsg(i18n.MsgChangesSaved)
 
 		p, err := query.PhotoPreloadByUID(uid)
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			AbortEntityNotFound(c)
 			return
 		}
 
-		SavePhotoAsYaml(p, conf)
+		SavePhotoAsYaml(p)
 
 		c.JSON(http.StatusOK, p)
 	})
@@ -112,9 +118,9 @@ func UpdatePhoto(router *gin.RouterGroup, conf *config.Config) {
 //
 // Parameters:
 //   uid: string PhotoUID as returned by the API
-func GetPhotoDownload(router *gin.RouterGroup, conf *config.Config) {
+func GetPhotoDownload(router *gin.RouterGroup) {
 	router.GET("/photos/:uid/dl", func(c *gin.Context) {
-		if InvalidDownloadToken(c, conf) {
+		if InvalidDownloadToken(c) {
 			c.Data(http.StatusForbidden, "image/svg+xml", brokenIconSvg)
 			return
 		}
@@ -122,7 +128,7 @@ func GetPhotoDownload(router *gin.RouterGroup, conf *config.Config) {
 		f, err := query.FileByPhotoUID(c.Param("uid"))
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			c.Data(http.StatusNotFound, "image/svg+xml", photoIconSvg)
 			return
 		}
 
@@ -150,10 +156,12 @@ func GetPhotoDownload(router *gin.RouterGroup, conf *config.Config) {
 //
 // Parameters:
 //   uid: string PhotoUID as returned by the API
-func GetPhotoYaml(router *gin.RouterGroup, conf *config.Config) {
+func GetPhotoYaml(router *gin.RouterGroup) {
 	router.GET("/photos/:uid/yaml", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionExport)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
@@ -179,14 +187,16 @@ func GetPhotoYaml(router *gin.RouterGroup, conf *config.Config) {
 	})
 }
 
-// POST /api/v1/photos/:uid/like
+// POST /api/v1/photos/:uid/approve
 //
 // Parameters:
 //   uid: string PhotoUID as returned by the API
-func LikePhoto(router *gin.RouterGroup, conf *config.Config) {
-	router.POST("/photos/:uid/like", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+func ApprovePhoto(router *gin.RouterGroup) {
+	router.POST("/photos/:uid/approve", func(c *gin.Context) {
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionUpdate)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
@@ -194,17 +204,52 @@ func LikePhoto(router *gin.RouterGroup, conf *config.Config) {
 		m, err := query.PhotoByUID(id)
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			AbortEntityNotFound(c)
+			return
+		}
+
+		if err := m.Approve(); err != nil {
+			log.Errorf("photo: %s", err.Error())
+			AbortSaveFailed(c)
+			return
+		}
+
+		SavePhotoAsYaml(m)
+
+		PublishPhotoEvent(EntityUpdated, id, c)
+
+		c.JSON(http.StatusOK, gin.H{"photo": m})
+	})
+}
+
+// POST /api/v1/photos/:uid/like
+//
+// Parameters:
+//   uid: string PhotoUID as returned by the API
+func LikePhoto(router *gin.RouterGroup) {
+	router.POST("/photos/:uid/like", func(c *gin.Context) {
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionLike)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
+			return
+		}
+
+		id := c.Param("uid")
+		m, err := query.PhotoByUID(id)
+
+		if err != nil {
+			AbortEntityNotFound(c)
 			return
 		}
 
 		if err := m.SetFavorite(true); err != nil {
 			log.Errorf("photo: %s", err.Error())
-			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrSaveFailed)
+			AbortSaveFailed(c)
 			return
 		}
 
-		SavePhotoAsYaml(m, conf)
+		SavePhotoAsYaml(m)
 
 		PublishPhotoEvent(EntityUpdated, id, c)
 
@@ -216,10 +261,12 @@ func LikePhoto(router *gin.RouterGroup, conf *config.Config) {
 //
 // Parameters:
 //   uid: string PhotoUID as returned by the API
-func DislikePhoto(router *gin.RouterGroup, conf *config.Config) {
+func DislikePhoto(router *gin.RouterGroup) {
 	router.DELETE("/photos/:uid/like", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionLike)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
@@ -227,17 +274,17 @@ func DislikePhoto(router *gin.RouterGroup, conf *config.Config) {
 		m, err := query.PhotoByUID(id)
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			AbortEntityNotFound(c)
 			return
 		}
 
 		if err := m.SetFavorite(false); err != nil {
 			log.Errorf("photo: %s", err.Error())
-			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrSaveFailed)
+			AbortSaveFailed(c)
 			return
 		}
 
-		SavePhotoAsYaml(m, conf)
+		SavePhotoAsYaml(m)
 
 		PublishPhotoEvent(EntityUpdated, id, c)
 
@@ -245,14 +292,17 @@ func DislikePhoto(router *gin.RouterGroup, conf *config.Config) {
 	})
 }
 
-// POST /api/v1/photos/:uid/primary/:file_uid
+// POST /api/v1/photos/:uid/files/:file_uid/primary
 //
 // Parameters:
 //   uid: string PhotoUID as returned by the API
-func SetPhotoPrimary(router *gin.RouterGroup, conf *config.Config) {
-	router.POST("/photos/:uid/primary/:file_uid", func(c *gin.Context) {
-		if Unauthorized(c, conf) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, ErrUnauthorized)
+//   file_uid: string File UID as returned by the API
+func PhotoPrimary(router *gin.RouterGroup) {
+	router.POST("/photos/:uid/files/:file_uid/primary", func(c *gin.Context) {
+		s := Auth(SessionID(c), acl.ResourcePhotos, acl.ActionUpdate)
+
+		if s.Invalid() {
+			AbortUnauthorized(c)
 			return
 		}
 
@@ -261,18 +311,18 @@ func SetPhotoPrimary(router *gin.RouterGroup, conf *config.Config) {
 		err := query.SetPhotoPrimary(uid, fileUID)
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			AbortEntityNotFound(c)
 			return
 		}
 
 		PublishPhotoEvent(EntityUpdated, uid, c)
 
-		event.Success("photo saved")
+		event.SuccessMsg(i18n.MsgChangesSaved)
 
 		p, err := query.PhotoPreloadByUID(uid)
 
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusNotFound, ErrPhotoNotFound)
+			AbortEntityNotFound(c)
 			return
 		}
 

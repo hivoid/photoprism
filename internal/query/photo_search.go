@@ -29,11 +29,11 @@ func PhotoSearch(f form.PhotoSearch) (results PhotoResults, count int, err error
 		files.id AS file_id, files.file_uid, files.file_primary, files.file_missing, files.file_name,
 		files.file_root, files.file_hash, files.file_codec, files.file_type, files.file_mime, files.file_width, 
 		files.file_height, files.file_aspect_ratio, files.file_orientation, files.file_main_color, 
-		files.file_colors, files.file_luminance, files.file_chroma,
+		files.file_colors, files.file_luminance, files.file_chroma, files.file_projection,
 		files.file_diff, files.file_video, files.file_duration, files.file_size,
 		cameras.camera_make, cameras.camera_model,
 		lenses.lens_make, lenses.lens_model,
-		places.loc_label, places.loc_city, places.loc_state, places.loc_country`).
+		places.place_label, places.place_city, places.place_state, places.place_country`).
 		Joins("JOIN files ON photos.id = files.photo_id AND files.file_missing = 0 AND files.deleted_at IS NULL").
 		Joins("JOIN cameras ON photos.camera_id = cameras.id").
 		Joins("JOIN lenses ON photos.lens_id = lenses.id").
@@ -47,6 +47,11 @@ func PhotoSearch(f form.PhotoSearch) (results PhotoResults, count int, err error
 		} else {
 			s = s.Where("files.file_error = ''")
 		}
+	}
+
+	// Return primary files only.
+	if f.Primary {
+		s = s.Where("files.file_primary = 1")
 	}
 
 	// Shortcut for known photo ids.
@@ -95,8 +100,8 @@ func PhotoSearch(f form.PhotoSearch) (results PhotoResults, count int, err error
 	}
 
 	// Filter by location.
-	if f.Location == true {
-		s = s.Where("location_id <> ''")
+	if f.Geo == true {
+		s = s.Where("photos.cell_id <> 'zz'")
 
 		if likeAny := LikeAny("k.keyword", f.Query); likeAny != "" {
 			s = s.Where("photos.id IN (SELECT pk.photo_id FROM keywords k JOIN photos_keywords pk ON k.id = pk.keyword_id WHERE (?))", gorm.Expr(likeAny))
@@ -173,6 +178,10 @@ func PhotoSearch(f form.PhotoSearch) (results PhotoResults, count int, err error
 		s = s.Where("photos.photo_month = ?", f.Month)
 	}
 
+	if (f.Day >= txt.DayMin && f.Month <= txt.DayMax) || f.Day == entity.DayUnknown {
+		s = s.Where("photos.photo_day = ?", f.Day)
+	}
+
 	if f.Color != "" {
 		s = s.Where("files.file_main_color IN (?)", strings.Split(strings.ToLower(f.Color), ","))
 	}
@@ -181,17 +190,25 @@ func PhotoSearch(f form.PhotoSearch) (results PhotoResults, count int, err error
 		s = s.Where("photos.photo_favorite = 1")
 	}
 
+	if f.Scan {
+		s = s.Where("photos.photo_scan = 1")
+	}
+
+	if f.Panorama {
+		s = s.Where("photos.photo_panorama = 1")
+	}
+
 	if f.Country != "" {
 		s = s.Where("photos.photo_country IN (?)", strings.Split(strings.ToLower(f.Country), ","))
 	}
 
 	if f.State != "" {
-		s = s.Where("places.loc_state IN (?)", strings.Split(txt.Title(f.State), ","))
+		s = s.Where("places.place_state IN (?)", strings.Split(f.State, ","))
 	}
 
 	if f.Category != "" {
-		s = s.Joins("JOIN locations ON photos.location_id = locations.id").
-			Where("locations.loc_category IN (?)", strings.Split(strings.ToLower(f.Category), ","))
+		s = s.Joins("JOIN cells ON photos.cell_id = cells.id").
+			Where("cells.cell_category IN (?)", strings.Split(strings.ToLower(f.Category), ","))
 	}
 
 	// Filter by media type.
@@ -292,16 +309,24 @@ func PhotoSearch(f form.PhotoSearch) (results PhotoResults, count int, err error
 		s = s.Where("photos.taken_at >= ?", f.After.Format("2006-01-02"))
 	}
 
+	if f.Stack {
+		s = s.Where("photos.id IN (SELECT a.photo_id FROM files a JOIN files b ON a.id != b.id AND a.photo_id = b.photo_id AND a.file_type = b.file_type WHERE a.file_type='jpg')")
+	}
+
 	if f.Album != "" {
 		if f.Filter != "" {
 			s = s.Where("photos.photo_uid NOT IN (SELECT photo_uid FROM photos_albums pa WHERE pa.hidden = 1 AND pa.album_uid = ?)", f.Album)
 		} else {
 			s = s.Joins("JOIN photos_albums ON photos_albums.photo_uid = photos.photo_uid").Where("photos_albums.hidden = 0 AND photos_albums.album_uid = ?", f.Album)
 		}
+	} else if f.Unsorted && f.Filter == "" {
+		s = s.Where("photos.photo_uid NOT IN (SELECT photo_uid FROM photos_albums pa WHERE pa.hidden = 0)")
 	}
 
 	// Set sort order for results.
 	switch f.Order {
+	case entity.SortOrderEdited:
+		s = s.Where("edited_at IS NOT NULL").Order("edited_at DESC, photos.photo_uid, files.file_primary DESC")
 	case entity.SortOrderRelevance:
 		if f.Label != "" {
 			s = s.Order("photo_quality DESC, photos_labels.uncertainty ASC, taken_at DESC, files.file_primary DESC")
@@ -312,21 +337,21 @@ func PhotoSearch(f form.PhotoSearch) (results PhotoResults, count int, err error
 		s = s.Order("taken_at DESC, photos.photo_uid, files.file_primary DESC")
 	case entity.SortOrderOldest:
 		s = s.Order("taken_at, photos.photo_uid, files.file_primary DESC")
-	case entity.SortOrderImported:
+	case entity.SortOrderAdded:
 		s = s.Order("photos.id DESC, files.file_primary DESC")
 	case entity.SortOrderSimilar:
 		s = s.Where("files.file_diff > 0")
-		s = s.Order("files.file_main_color, photos.location_id, files.file_diff, taken_at DESC, files.file_primary DESC")
+		s = s.Order("files.file_main_color, photos.cell_id, files.file_diff, taken_at DESC, files.file_primary DESC")
 	case entity.SortOrderName:
 		s = s.Order("photos.photo_path, photos.photo_name, files.file_primary DESC")
 	default:
 		s = s.Order("taken_at DESC, photos.photo_uid, files.file_primary DESC")
 	}
 
-	if f.Count > 0 && f.Count <= 1000 {
+	if f.Count > 0 && f.Count <= MaxResults {
 		s = s.Limit(f.Count).Offset(f.Offset)
 	} else {
-		s = s.Limit(100).Offset(0)
+		s = s.Limit(MaxResults).Offset(f.Offset)
 	}
 
 	if err := s.Scan(&results).Error; err != nil {

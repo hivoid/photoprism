@@ -15,12 +15,13 @@ type Data struct {
 	Duration     time.Duration `meta:"Duration,MediaDuration,TrackDuration"`
 	Codec        string        `meta:"CompressorID,Compression,FileType"`
 	Title        string        `meta:"Title"`
-	Subject      string        `meta:"Subject,PersonInImage"`
+	Subject      string        `meta:"Subject,PersonInImage,ObjectName"`
 	Keywords     string        `meta:"Keywords"`
 	Comment      string        `meta:"-"`
 	Artist       string        `meta:"Artist,Creator"`
 	Description  string        `meta:"Description"`
 	Copyright    string        `meta:"Rights,Copyright"`
+	Projection   string        `meta:"ProjectionType"`
 	CameraMake   string        `meta:"CameraMake,Make"`
 	CameraModel  string        `meta:"CameraModel,Model"`
 	CameraOwner  string        `meta:"OwnerName"`
@@ -43,8 +44,17 @@ type Data struct {
 	Height       int           `meta:"PixelYDimension,ImageHeight,ImageLength,ExifImageHeight,SourceImageHeight"`
 	Orientation  int           `meta:"-"`
 	Rotation     int           `meta:"Rotation"`
+	Views        int           `meta:"-"`
+	Albums       []string      `meta:"-"`
 	Error        error         `meta:"-"`
 	All          map[string]string
+}
+
+// NewData creates a new metadata struct.
+func NewData() Data {
+	return Data{
+		All: make(map[string]string),
+	}
 }
 
 // AspectRatio returns the aspect ratio based on width and height.

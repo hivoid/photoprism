@@ -30,6 +30,7 @@ type Types map[string]interface{}
 // List of database entities and their table names.
 var Entities = Types{
 	"errors":          &Error{},
+	"people":          &Person{},
 	"accounts":        &Account{},
 	"folders":         &Folder{},
 	"files":           &File{},
@@ -38,7 +39,7 @@ var Entities = Types{
 	"photos":          &Photo{},
 	"details":         &Details{},
 	"places":          &Place{},
-	"locations":       &Location{},
+	"cells":           &Cell{},
 	"cameras":         &Camera{},
 	"lenses":          &Lens{},
 	"countries":       &Country{},
@@ -49,6 +50,7 @@ var Entities = Types{
 	"photos_labels":   &PhotoLabel{},
 	"keywords":        &Keyword{},
 	"photos_keywords": &PhotoKeyword{},
+	"passwords":       &Password{},
 	"links":           &Link{},
 }
 
@@ -117,12 +119,12 @@ func (list Types) Drop() {
 
 // Creates default database entries for test and production.
 func CreateDefaultFixtures() {
+	CreateDefaultUsers()
 	CreateUnknownPlace()
 	CreateUnknownLocation()
 	CreateUnknownCountry()
 	CreateUnknownCamera()
 	CreateUnknownLens()
-	// CreateViews()
 }
 
 // MigrateDb creates all tables and inserts default entities as needed.

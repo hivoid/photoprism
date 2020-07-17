@@ -29,11 +29,11 @@ func ImportWorker(jobs <-chan ImportJob) {
 		importPath := job.ImportOpt.Path
 
 		if related.Main == nil {
-			log.Warnf("import: no media file found for %s", txt.Quote(fs.Rel(job.FileName, importPath)))
+			log.Warnf("import: %s belongs to no supported media file", txt.Quote(fs.RelName(job.FileName, importPath)))
 			continue
 		}
 
-		originalName := related.Main.RelativeName(importPath)
+		originalName := related.Main.RelName(importPath)
 
 		event.Publish("import.file", event.Data{
 			"fileName": originalName,
@@ -41,27 +41,27 @@ func ImportWorker(jobs <-chan ImportJob) {
 		})
 
 		for _, f := range related.Files {
-			relativeFilename := f.RelativeName(importPath)
+			relativeFilename := f.RelName(importPath)
 
 			if destinationFilename, err := imp.DestinationFilename(related.Main, f); err == nil {
 				if err := os.MkdirAll(path.Dir(destinationFilename), os.ModePerm); err != nil {
-					log.Errorf("import: could not create folders (%s)", err.Error())
+					log.Errorf("import: failed creating folders for %s (%s)", txt.Quote(f.BaseName()), err.Error())
 				}
 
 				if related.Main.HasSameName(f) {
 					destinationMainFilename = destinationFilename
-					log.Infof("import: moving main %s file %s to %s", f.FileType(), txt.Quote(relativeFilename), txt.Quote(fs.Rel(destinationFilename, imp.originalsPath())))
+					log.Infof("import: moving main %s file %s to %s", f.FileType(), txt.Quote(relativeFilename), txt.Quote(fs.RelName(destinationFilename, imp.originalsPath())))
 				} else {
-					log.Infof("import: moving related %s file %s to %s", f.FileType(), txt.Quote(relativeFilename), txt.Quote(fs.Rel(destinationFilename, imp.originalsPath())))
+					log.Infof("import: moving related %s file %s to %s", f.FileType(), txt.Quote(relativeFilename), txt.Quote(fs.RelName(destinationFilename, imp.originalsPath())))
 				}
 
 				if opt.Move {
 					if err := f.Move(destinationFilename); err != nil {
-						log.Errorf("import: could not move file to %s (%s)", txt.Quote(fs.Rel(destinationMainFilename, imp.originalsPath())), err.Error())
+						log.Errorf("import: failed moving file to %s (%s)", txt.Quote(fs.RelName(destinationMainFilename, imp.originalsPath())), err.Error())
 					}
 				} else {
 					if err := f.Copy(destinationFilename); err != nil {
-						log.Errorf("import: could not copy file to %s (%s)", txt.Quote(fs.Rel(destinationMainFilename, imp.originalsPath())), err.Error())
+						log.Errorf("import: failed copying file to %s (%s)", txt.Quote(fs.RelName(destinationMainFilename, imp.originalsPath())), err.Error())
 					}
 				}
 			} else {
@@ -69,7 +69,7 @@ func ImportWorker(jobs <-chan ImportJob) {
 
 				if opt.RemoveExistingFiles {
 					if err := f.Remove(); err != nil {
-						log.Errorf("import: could not delete %s (%s)", txt.Quote(fs.Rel(f.FileName(), importPath)), err.Error())
+						log.Errorf("import: failed deleting %s (%s)", txt.Quote(f.BaseName()), err.Error())
 					} else {
 						log.Infof("import: deleted %s (already exists)", txt.Quote(relativeFilename))
 					}
@@ -81,16 +81,16 @@ func ImportWorker(jobs <-chan ImportJob) {
 			f, err := NewMediaFile(destinationMainFilename)
 
 			if err != nil {
-				log.Errorf("import: could not import %s (%s)", txt.Quote(fs.Rel(destinationMainFilename, imp.originalsPath())), err.Error())
+				log.Errorf("import: %s in %s", err.Error(), txt.Quote(fs.RelName(destinationMainFilename, imp.originalsPath())))
 				continue
 			}
 
 			if !f.HasJpeg() {
 				if jpegFile, err := imp.convert.ToJpeg(f); err != nil {
-					log.Errorf("import: creating jpeg failed (%s)", err.Error())
+					log.Errorf("import: %s in %s (convert to jpeg)", err.Error(), txt.Quote(fs.RelName(destinationMainFilename, imp.originalsPath())))
 					continue
 				} else {
-					log.Infof("import: %s created", fs.Rel(jpegFile.FileName(), imp.originalsPath()))
+					log.Infof("import: %s created", fs.RelName(jpegFile.FileName(), imp.originalsPath()))
 				}
 			}
 
@@ -98,41 +98,44 @@ func ImportWorker(jobs <-chan ImportJob) {
 				log.Error(err)
 			} else {
 				if err := jpg.ResampleDefault(imp.thumbPath(), false); err != nil {
-					log.Errorf("import: could not create default thumbnails (%s)", err.Error())
+					log.Errorf("import: %s in %s (resample)", err.Error(), txt.Quote(jpg.BaseName()))
 					continue
 				}
 			}
 
 			if imp.conf.SidecarJson() && !f.HasJson() {
 				if jsonFile, err := imp.convert.ToJson(f); err != nil {
-					log.Errorf("import: creating json sidecar file failed (%s)", err.Error())
+					log.Errorf("import: %s in %s (create json sidecar)", err.Error(), txt.Quote(f.BaseName()))
 				} else {
-					log.Infof("import: %s created", fs.Rel(jsonFile.FileName(), imp.originalsPath()))
+					log.Infof("import: %s created", fs.RelName(jsonFile.FileName(), imp.originalsPath()))
 				}
 			}
 
-			related, err := f.RelatedFiles(imp.conf.Settings().Index.Group)
+			related, err := f.RelatedFiles(imp.conf.Settings().Index.Sequences)
 
 			if err != nil {
-				log.Errorf("import: could not index %s (%s)", txt.Quote(fs.Rel(destinationMainFilename, imp.originalsPath())), err.Error())
+				log.Errorf("import: %s in %s (find related files)", err.Error(), txt.Quote(fs.RelName(destinationMainFilename, imp.originalsPath())))
 
 				continue
 			}
 
 			done := make(map[string]bool)
 			ind := imp.index
+			sizeLimit := ind.conf.OriginalsLimit()
 
 			if related.Main != nil {
+				f := related.Main
+
 				// Enforce file size limit for originals.
-				if ind.conf.OriginalsLimit() > 0 && related.Main.FileSize() > ind.conf.OriginalsLimit() {
-					log.Warnf("import: %s exceeds file size limit for originals [%d / %d MB]", filepath.Base(related.Main.FileName()), related.Main.FileSize()/(1024*1024), ind.conf.OriginalsLimit()/(1024*1024))
+				if sizeLimit > 0 && f.FileSize() > sizeLimit {
+					log.Warnf("import: %s exceeds file size limit (%d / %d MB)", txt.Quote(f.BaseName()), f.FileSize()/(1024*1024), sizeLimit/(1024*1024))
 					continue
 				}
 
-				res := ind.MediaFile(related.Main, indexOpt, originalName)
+				res := ind.MediaFile(f, indexOpt, originalName)
 
-				log.Infof("import: %s main %s file %s", res, related.Main.FileType(), txt.Quote(related.Main.RelativeName(ind.originalsPath())))
-				done[related.Main.FileName()] = true
+				log.Infof("import: %s main %s file %s", res, f.FileType(), txt.Quote(f.RelName(ind.originalsPath())))
+				done[f.FileName()] = true
 
 				if res.Success() {
 					if err := entity.AddPhotoToAlbums(res.PhotoUID, opt.Albums); err != nil {
@@ -142,7 +145,7 @@ func ImportWorker(jobs <-chan ImportJob) {
 					continue
 				}
 			} else {
-				log.Warnf("import: no main file for %s (conversion to jpeg failed?)", fs.Rel(destinationMainFilename, imp.originalsPath()))
+				log.Warnf("import: no main file for %s, conversion to jpeg failed?", fs.RelName(destinationMainFilename, imp.originalsPath()))
 			}
 
 			for _, f := range related.Files {
@@ -154,10 +157,17 @@ func ImportWorker(jobs <-chan ImportJob) {
 					continue
 				}
 
-				res := ind.MediaFile(f, indexOpt, "")
 				done[f.FileName()] = true
 
-				log.Infof("import: %s related %s file %s", res, f.FileType(), txt.Quote(f.RelativeName(ind.originalsPath())))
+				// Enforce file size limit for originals.
+				if sizeLimit > 0 && f.FileSize() > sizeLimit {
+					log.Warnf("import: %s exceeds file size limit (%d / %d MB)", txt.Quote(f.BaseName()), f.FileSize()/(1024*1024), sizeLimit/(1024*1024))
+					continue
+				}
+
+				res := ind.MediaFile(f, indexOpt, "")
+
+				log.Infof("import: %s related %s file %s", res, f.FileType(), txt.Quote(f.RelName(ind.originalsPath())))
 			}
 
 		}

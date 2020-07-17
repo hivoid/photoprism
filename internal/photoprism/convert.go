@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
+	"strconv"
 	"sync"
 
 	"github.com/karrick/godirwalk"
@@ -16,6 +18,7 @@ import (
 	"github.com/photoprism/photoprism/internal/mutex"
 	"github.com/photoprism/photoprism/internal/thumb"
 	"github.com/photoprism/photoprism/pkg/fs"
+	"github.com/photoprism/photoprism/pkg/txt"
 )
 
 // Convert represents a converter that can convert RAW/HEIF images to JPEG.
@@ -58,14 +61,14 @@ func (c *Convert) Start(path string) error {
 	}
 
 	ignore.Log = func(fileName string) {
-		log.Infof(`convert: ignored "%s"`, fs.Rel(fileName, path))
+		log.Infof("convert: ignoring %s", txt.Quote(filepath.Base(fileName)))
 	}
 
 	err := godirwalk.Walk(path, &godirwalk.Options{
 		Callback: func(fileName string, info *godirwalk.Dirent) error {
 			defer func() {
-				if err := recover(); err != nil {
-					log.Errorf("convert: %s [panic]", err)
+				if r := recover(); r != nil {
+					log.Errorf("convert: %s (panic)\nstack: %s", r, debug.Stack())
 				}
 			}()
 
@@ -105,37 +108,9 @@ func (c *Convert) Start(path string) error {
 	return err
 }
 
-// ConvertCommand returns the command for converting files to JPEG, depending on the format.
-func (c *Convert) ConvertCommand(mf *MediaFile, jpegName string, xmpName string) (result *exec.Cmd, useMutex bool, err error) {
-	if mf.IsRaw() {
-		if c.conf.SipsBin() != "" {
-			result = exec.Command(c.conf.SipsBin(), "-s", "format", "jpeg", "--out", jpegName, mf.FileName())
-		} else if c.conf.DarktableBin() != "" {
-			// Only one instance of darktable-cli allowed due to locking
-			useMutex = true
-
-			if xmpName != "" {
-				result = exec.Command(c.conf.DarktableBin(), mf.FileName(), xmpName, jpegName)
-			} else {
-				result = exec.Command(c.conf.DarktableBin(), mf.FileName(), jpegName)
-			}
-		} else {
-			return nil, useMutex, fmt.Errorf("convert: no raw to jpeg converter installed (%s)", mf.Base(c.conf.Settings().Index.Group))
-		}
-	} else if mf.IsVideo() {
-		result = exec.Command(c.conf.FFmpegBin(), "-i", mf.FileName(), "-ss", "00:00:00.001", "-vframes", "1", jpegName)
-	} else if mf.IsHEIF() {
-		result = exec.Command(c.conf.HeifConvertBin(), mf.FileName(), jpegName)
-	} else {
-		return nil, useMutex, fmt.Errorf("convert: file type not supported for conversion (%s)", mf.FileType())
-	}
-
-	return result, useMutex, nil
-}
-
 // ToJson uses exiftool to export metadata to a json file.
 func (c *Convert) ToJson(mf *MediaFile) (*MediaFile, error) {
-	jsonName := fs.TypeJson.FindFirst(mf.FileName(), []string{c.conf.SidecarPath(), fs.HiddenPath}, c.conf.OriginalsPath(), c.conf.Settings().Index.Group)
+	jsonName := fs.TypeJson.FindFirst(mf.FileName(), []string{c.conf.SidecarPath(), fs.HiddenPath}, c.conf.OriginalsPath(), c.conf.Settings().Index.Sequences)
 
 	result, err := NewMediaFile(jsonName)
 
@@ -144,12 +119,12 @@ func (c *Convert) ToJson(mf *MediaFile) (*MediaFile, error) {
 	}
 
 	if !c.conf.SidecarWritable() {
-		return nil, fmt.Errorf("convert: metadata export to json disabled in read only mode (%s)", mf.RelativeName(c.conf.OriginalsPath()))
+		return nil, fmt.Errorf("convert: can't create json sidecar file for %s in read only mode", txt.Quote(mf.BaseName()))
 	}
 
-	jsonName = fs.FileName(mf.FileName(), c.conf.SidecarPath(), c.conf.OriginalsPath(), ".json", c.conf.Settings().Index.Group)
+	jsonName = fs.FileName(mf.FileName(), c.conf.SidecarPath(), c.conf.OriginalsPath(), ".json", c.conf.Settings().Index.Sequences)
 
-	fileName := mf.RelativeName(c.conf.OriginalsPath())
+	fileName := mf.RelName(c.conf.OriginalsPath())
 
 	log.Infof("convert: %s -> %s", fileName, filepath.Base(jsonName))
 
@@ -183,17 +158,57 @@ func (c *Convert) ToJson(mf *MediaFile) (*MediaFile, error) {
 	return NewMediaFile(jsonName)
 }
 
+// JpegConvertCommand returns the command for converting files to JPEG, depending on the format.
+func (c *Convert) JpegConvertCommand(mf *MediaFile, jpegName string, xmpName string) (result *exec.Cmd, useMutex bool, err error) {
+	size := strconv.Itoa(c.conf.JpegSize())
+
+	if mf.IsRaw() {
+		if c.conf.SipsBin() != "" {
+			result = exec.Command(c.conf.SipsBin(), "-Z", size, "-s", "format", "jpeg", "--out", jpegName, mf.FileName())
+		} else if c.conf.DarktableBin() != "" {
+			var args []string
+
+			// Only one instance of darktable-cli allowed due to locking if presets are loaded.
+			if c.conf.DarktableUnlock() {
+				useMutex = false
+				args = []string{"--apply-custom-presets", "false", "--width", size, "--height", size, mf.FileName()}
+			} else {
+				useMutex = true
+				args = []string{"--width", size, "--height", size, mf.FileName()}
+			}
+
+			if xmpName != "" {
+				args = append(args, xmpName, jpegName)
+			} else {
+				args = append(args, jpegName)
+			}
+
+			result = exec.Command(c.conf.DarktableBin(), args...)
+		} else {
+			return nil, useMutex, fmt.Errorf("convert: no converter found for %s", txt.Quote(mf.BaseName()))
+		}
+	} else if mf.IsVideo() {
+		result = exec.Command(c.conf.FFmpegBin(), "-i", mf.FileName(), "-ss", "00:00:00.001", "-vframes", "1", jpegName)
+	} else if mf.IsHEIF() {
+		result = exec.Command(c.conf.HeifConvertBin(), mf.FileName(), jpegName)
+	} else {
+		return nil, useMutex, fmt.Errorf("convert: file type %s not supported in %s", mf.FileType(), txt.Quote(mf.BaseName()))
+	}
+
+	return result, useMutex, nil
+}
+
 // ToJpeg converts a single image file to JPEG if possible.
 func (c *Convert) ToJpeg(image *MediaFile) (*MediaFile, error) {
 	if !image.Exists() {
-		return nil, fmt.Errorf("convert: can not convert to jpeg, file does not exist (%s)", image.RelativeName(c.conf.OriginalsPath()))
+		return nil, fmt.Errorf("convert: can not convert to jpeg, file does not exist (%s)", image.RelName(c.conf.OriginalsPath()))
 	}
 
 	if image.IsJpeg() {
 		return image, nil
 	}
 
-	jpegName := fs.TypeJpeg.FindFirst(image.FileName(), []string{c.conf.SidecarPath(), fs.HiddenPath}, c.conf.OriginalsPath(), c.conf.Settings().Index.Group)
+	jpegName := fs.TypeJpeg.FindFirst(image.FileName(), []string{c.conf.SidecarPath(), fs.HiddenPath}, c.conf.OriginalsPath(), c.conf.Settings().Index.Sequences)
 
 	mediaFile, err := NewMediaFile(jpegName)
 
@@ -202,15 +217,15 @@ func (c *Convert) ToJpeg(image *MediaFile) (*MediaFile, error) {
 	}
 
 	if !c.conf.SidecarWritable() {
-		return nil, fmt.Errorf("convert: disabled in read only mode (%s)", image.RelativeName(c.conf.OriginalsPath()))
+		return nil, fmt.Errorf("convert: disabled in read only mode (%s)", image.RelName(c.conf.OriginalsPath()))
 	}
 
-	jpegName = fs.FileName(image.FileName(), c.conf.SidecarPath(), c.conf.OriginalsPath(), fs.JpegExt, c.conf.Settings().Index.Group)
-	fileName := image.RelativeName(c.conf.OriginalsPath())
+	jpegName = fs.FileName(image.FileName(), c.conf.SidecarPath(), c.conf.OriginalsPath(), fs.JpegExt, c.conf.Settings().Index.Sequences)
+	fileName := image.RelName(c.conf.OriginalsPath())
 
 	log.Infof("convert: %s -> %s", fileName, filepath.Base(jpegName))
 
-	xmpName := fs.TypeXMP.Find(image.FileName(), c.conf.Settings().Index.Group)
+	xmpName := fs.TypeXMP.Find(image.FileName(), c.conf.Settings().Index.Sequences)
 
 	event.Publish("index.converting", event.Data{
 		"fileType": image.FileType(),
@@ -229,7 +244,7 @@ func (c *Convert) ToJpeg(image *MediaFile) (*MediaFile, error) {
 		return NewMediaFile(jpegName)
 	}
 
-	cmd, useMutex, err := c.ConvertCommand(image, jpegName, xmpName)
+	cmd, useMutex, err := c.JpegConvertCommand(image, jpegName, xmpName)
 
 	if err != nil {
 		return nil, err

@@ -7,8 +7,19 @@ import (
 )
 
 func TestFirstOrCreateCamera(t *testing.T) {
-	t.Run("iphone-se", func(t *testing.T) {
+	t.Run("existing camera", func(t *testing.T) {
 		camera := NewCamera("iPhone SE", "Apple")
+
+		result := FirstOrCreateCamera(camera)
+
+		if result == nil {
+			t.Fatal("result should not be nil")
+		}
+
+		assert.GreaterOrEqual(t, result.ID, uint(1))
+	})
+	t.Run("not existing camera", func(t *testing.T) {
+		camera := &Camera{ID: 10000000, CameraSlug: "camera-slug"}
 
 		result := FirstOrCreateCamera(camera)
 

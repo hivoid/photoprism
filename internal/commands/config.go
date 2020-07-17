@@ -32,6 +32,7 @@ func configAction(ctx *cli.Context) error {
 
 	// Site information.
 	fmt.Printf("%-25s %s\n", "site-url", conf.SiteUrl())
+	fmt.Printf("%-25s %s\n", "site-preview", conf.SitePreview())
 	fmt.Printf("%-25s %s\n", "site-title", conf.SiteTitle())
 	fmt.Printf("%-25s %s\n", "site-caption", conf.SiteCaption())
 	fmt.Printf("%-25s %s\n", "site-description", conf.SiteDescription())
@@ -46,7 +47,6 @@ func configAction(ctx *cli.Context) error {
 
 	// Passwords.
 	fmt.Printf("%-25s %s\n", "admin-password", conf.AdminPassword())
-	fmt.Printf("%-25s %s\n", "webdav-password", conf.WebDAVPassword())
 
 	// Background workers and logging.
 	fmt.Printf("%-25s %d\n", "workers", conf.Workers())
@@ -64,6 +64,7 @@ func configAction(ctx *cli.Context) error {
 	fmt.Printf("%-25s %s\n", "database-driver", dbDriver)
 	fmt.Printf("%-25s %s\n", "database-dsn", dbDsn)
 	fmt.Printf("%-25s %d\n", "database-conns", conf.DatabaseConns())
+	fmt.Printf("%-25s %d\n", "database-conns-idle", conf.DatabaseConnsIdle())
 
 	// Main directories.
 	fmt.Printf("%-25s %s\n", "assets-path", conf.AssetsPath())
@@ -74,10 +75,10 @@ func configAction(ctx *cli.Context) error {
 
 	// Additional path and file names.
 	fmt.Printf("%-25s %s\n", "static-path", conf.StaticPath())
-	fmt.Printf("%-25s %s\n", "static-build-path", conf.StaticBuildPath())
-	fmt.Printf("%-25s %s\n", "favicons-path", conf.FaviconsPath())
+	fmt.Printf("%-25s %s\n", "build-path", conf.BuildPath())
+	fmt.Printf("%-25s %s\n", "img-path", conf.ImgPath())
 	fmt.Printf("%-25s %s\n", "templates-path", conf.TemplatesPath())
-	fmt.Printf("%-25s %s\n", "default-template", conf.DefaultTemplate())
+	fmt.Printf("%-25s %s\n", "template-name", conf.TemplateName())
 	fmt.Printf("%-25s %s\n", "cache-path", conf.CachePath())
 	fmt.Printf("%-25s %s\n", "temp-path", conf.TempPath())
 	fmt.Printf("%-25s %s\n", "config-file", conf.ConfigFile())
@@ -85,8 +86,9 @@ func configAction(ctx *cli.Context) error {
 	fmt.Printf("%-25s %t\n", "settings-hidden", conf.SettingsHidden())
 
 	// External binaries and sidecar configuration.
-	fmt.Printf("%-25s %s\n", "sips-bin", conf.SipsBin())
 	fmt.Printf("%-25s %s\n", "darktable-bin", conf.DarktableBin())
+	fmt.Printf("%-25s %t\n", "darktable-unlock", conf.DarktableUnlock())
+	fmt.Printf("%-25s %s\n", "sips-bin", conf.SipsBin())
 	fmt.Printf("%-25s %s\n", "heifconvert-bin", conf.HeifConvertBin())
 	fmt.Printf("%-25s %s\n", "ffmpeg-bin", conf.FFmpegBin())
 	fmt.Printf("%-25s %s\n", "exiftool-bin", conf.ExifToolBin())
@@ -97,14 +99,15 @@ func configAction(ctx *cli.Context) error {
 	// Places / Geocoding API configuration.
 	fmt.Printf("%-25s %s\n", "geocoding-api", conf.GeoCodingApi())
 
-	// Thumbnails, resampling and download security token.
+	// Thumbs, resampling and download security token.
 	fmt.Printf("%-25s %s\n", "download-token", conf.DownloadToken())
-	fmt.Printf("%-25s %s\n", "thumb-token", conf.PreviewToken())
+	fmt.Printf("%-25s %s\n", "preview-token", conf.PreviewToken())
 	fmt.Printf("%-25s %s\n", "thumb-filter", conf.ThumbFilter())
 	fmt.Printf("%-25s %t\n", "thumb-uncached", conf.ThumbUncached())
 	fmt.Printf("%-25s %d\n", "thumb-size", conf.ThumbSize())
-	fmt.Printf("%-25s %d\n", "thumb-limit", conf.ThumbLimit())
+	fmt.Printf("%-25s %d\n", "thumb-size-uncached", conf.ThumbSizeUncached())
 	fmt.Printf("%-25s %s\n", "thumb-path", conf.ThumbPath())
+	fmt.Printf("%-25s %d\n", "jpeg-size", conf.JpegSize())
 	fmt.Printf("%-25s %d\n", "jpeg-quality", conf.JpegQuality())
 
 	return nil

@@ -19,7 +19,7 @@ import (
 
 type Photos []Photo
 
-// UIDs returns a slice of unique photo IDs.
+// UIDs returns a slice of photo UIDs.
 func (m Photos) UIDs() []string {
 	result := make([]string, len(m))
 
@@ -33,47 +33,51 @@ func (m Photos) UIDs() []string {
 // Photo represents a photo, all its properties, and link to all its images and sidecar files.
 type Photo struct {
 	ID               uint         `gorm:"primary_key" yaml:"-"`
-	UUID             string       `gorm:"type:varbinary(36);index;" json:"DocumentID,omitempty" yaml:"DocumentID,omitempty"`
+	UUID             string       `gorm:"type:varbinary(42);index;" json:"DocumentID,omitempty" yaml:"DocumentID,omitempty"`
 	TakenAt          time.Time    `gorm:"type:datetime;index:idx_photos_taken_uid;" json:"TakenAt" yaml:"TakenAt"`
 	TakenAtLocal     time.Time    `gorm:"type:datetime;" yaml:"-"`
 	TakenSrc         string       `gorm:"type:varbinary(8);" json:"TakenSrc" yaml:"TakenSrc,omitempty"`
-	PhotoUID         string       `gorm:"type:varbinary(36);unique_index;index:idx_photos_taken_uid;" json:"UID" yaml:"UID"`
+	PhotoUID         string       `gorm:"type:varbinary(42);unique_index;index:idx_photos_taken_uid;" json:"UID" yaml:"UID"`
 	PhotoType        string       `gorm:"type:varbinary(8);default:'image';" json:"Type" yaml:"Type"`
+	TypeSrc          string       `gorm:"type:varbinary(8);" json:"TypeSrc" yaml:"TypeSrc,omitempty"`
 	PhotoTitle       string       `gorm:"type:varchar(255);" json:"Title" yaml:"Title"`
 	TitleSrc         string       `gorm:"type:varbinary(8);" json:"TitleSrc" yaml:"TitleSrc,omitempty"`
 	PhotoDescription string       `gorm:"type:text;" json:"Description" yaml:"Description,omitempty"`
 	DescriptionSrc   string       `gorm:"type:varbinary(8);" json:"DescriptionSrc" yaml:"DescriptionSrc,omitempty"`
-	Details          Details      `json:"Details" yaml:"Details"`
 	PhotoPath        string       `gorm:"type:varbinary(768);index;" json:"Path" yaml:"-"`
 	PhotoName        string       `gorm:"type:varbinary(255);" json:"Name" yaml:"-"`
 	OriginalName     string       `gorm:"type:varbinary(768);" json:"OriginalName" yaml:"OriginalName,omitempty"`
 	PhotoFavorite    bool         `json:"Favorite" yaml:"Favorite,omitempty"`
 	PhotoPrivate     bool         `json:"Private" yaml:"Private,omitempty"`
+	PhotoScan        bool         `json:"Scan" yaml:"Scan,omitempty"`
+	PhotoPanorama    bool         `json:"Panorama" yaml:"Panorama,omitempty"`
 	TimeZone         string       `gorm:"type:varbinary(64);" json:"TimeZone" yaml:"-"`
-	PlaceID          string       `gorm:"type:varbinary(24);index;" json:"PlaceID" yaml:"-"`
-	LocationID       string       `gorm:"type:varbinary(24);index;" json:"LocationID" yaml:"-"`
-	LocSrc           string       `gorm:"type:varbinary(8);" json:"LocSrc" yaml:"LocSrc,omitempty"`
+	PlaceID          string       `gorm:"type:varbinary(42);index;default:'zz'" json:"PlaceID" yaml:"-"`
+	PlaceSrc         string       `gorm:"type:varbinary(8);" json:"PlaceSrc" yaml:"PlaceSrc,omitempty"`
+	CellID           string       `gorm:"type:varbinary(42);index;default:'zz'" json:"CellID" yaml:"-"`
+	CellAccuracy     int          `json:"CellAccuracy" yaml:"CellAccuracy,omitempty"`
+	PhotoAltitude    int          `json:"Altitude" yaml:"Altitude,omitempty"`
 	PhotoLat         float32      `gorm:"type:FLOAT;index;" json:"Lat" yaml:"Lat,omitempty"`
 	PhotoLng         float32      `gorm:"type:FLOAT;index;" json:"Lng" yaml:"Lng,omitempty"`
-	PhotoAltitude    int          `json:"Altitude" yaml:"Altitude,omitempty"`
 	PhotoCountry     string       `gorm:"type:varbinary(2);index:idx_photos_country_year_month;default:'zz'" json:"Country" yaml:"-"`
-	PhotoYear        int          `gorm:"index:idx_photos_country_year_month;" json:"Year" yaml:"-"`
-	PhotoMonth       int          `gorm:"index:idx_photos_country_year_month;" json:"Month" yaml:"-"`
+	PhotoYear        int          `gorm:"index:idx_photos_country_year_month;" json:"Year" yaml:"Year"`
+	PhotoMonth       int          `gorm:"index:idx_photos_country_year_month;" json:"Month" yaml:"Month"`
+	PhotoDay         int          `json:"Day" yaml:"Day"`
 	PhotoIso         int          `json:"Iso" yaml:"ISO,omitempty"`
 	PhotoExposure    string       `gorm:"type:varbinary(64);" json:"Exposure" yaml:"Exposure,omitempty"`
 	PhotoFNumber     float32      `gorm:"type:FLOAT;" json:"FNumber" yaml:"FNumber,omitempty"`
 	PhotoFocalLength int          `json:"FocalLength" yaml:"FocalLength,omitempty"`
 	PhotoQuality     int          `gorm:"type:SMALLINT" json:"Quality" yaml:"-"`
 	PhotoResolution  int          `gorm:"type:SMALLINT" json:"Resolution" yaml:"-"`
-	CameraID         uint         `gorm:"index:idx_photos_camera_lens;" json:"CameraID" yaml:"-"`
+	CameraID         uint         `gorm:"index:idx_photos_camera_lens;default:1" json:"CameraID" yaml:"-"`
 	CameraSerial     string       `gorm:"type:varbinary(255);" json:"CameraSerial" yaml:"CameraSerial,omitempty"`
 	CameraSrc        string       `gorm:"type:varbinary(8);" json:"CameraSrc" yaml:"-"`
-	LensID           uint         `gorm:"index:idx_photos_camera_lens;" json:"LensID" yaml:"-"`
+	LensID           uint         `gorm:"index:idx_photos_camera_lens;default:1" json:"LensID" yaml:"-"`
+	Details          *Details     `gorm:"association_autoupdate:false;association_autocreate:false;association_save_reference:false" json:"Details" yaml:"Details"`
 	Camera           *Camera      `gorm:"association_autoupdate:false;association_autocreate:false;association_save_reference:false" json:"Camera" yaml:"-"`
 	Lens             *Lens        `gorm:"association_autoupdate:false;association_autocreate:false;association_save_reference:false" json:"Lens" yaml:"-"`
-	Location         *Location    `gorm:"association_autoupdate:false;association_autocreate:false;association_save_reference:false" json:"Location" yaml:"-"`
+	Cell             *Cell        `gorm:"association_autoupdate:false;association_autocreate:false;association_save_reference:false" json:"Cell" yaml:"-"`
 	Place            *Place       `gorm:"association_autoupdate:false;association_autocreate:false;association_save_reference:false" json:"Place" yaml:"-"`
-	Links            []Link       `gorm:"foreignkey:share_uid;association_foreignkey:photo_uid" json:"Links" yaml:"-"`
 	Keywords         []Keyword    `json:"-" yaml:"-"`
 	Albums           []Album      `json:"-" yaml:"-"`
 	Files            []File       `yaml:"-"`
@@ -81,7 +85,7 @@ type Photo struct {
 	CreatedAt        time.Time    `yaml:"CreatedAt,omitempty"`
 	UpdatedAt        time.Time    `yaml:"UpdatedAt,omitempty"`
 	EditedAt         *time.Time   `yaml:"EditedAt,omitempty"`
-	MaintainedAt     *time.Time   `sql:"index" yaml:"-"`
+	CheckedAt        *time.Time   `sql:"index" yaml:"-"`
 	DeletedAt        *time.Time   `sql:"index" yaml:"DeletedAt,omitempty"`
 }
 
@@ -92,8 +96,12 @@ func NewPhoto() Photo {
 		PhotoCountry: UnknownCountry.ID,
 		CameraID:     UnknownCamera.ID,
 		LensID:       UnknownLens.ID,
-		LocationID:   UnknownLocation.ID,
+		CellID:       UnknownLocation.ID,
 		PlaceID:      UnknownPlace.ID,
+		Camera:       &UnknownCamera,
+		Lens:         &UnknownLens,
+		Cell:         &UnknownLocation,
+		Place:        &UnknownPlace,
 	}
 }
 
@@ -109,25 +117,27 @@ func SavePhotoForm(model Photo, form form.Photo, geoApi string) error {
 		return errors.New("photo: can't save form, id is empty")
 	}
 
-	model.UpdateYearMonth()
+	model.UpdateDateFields()
+
+	details := model.GetDetails()
 
 	if form.Details.PhotoID == model.ID {
-		if err := deepcopier.Copy(&model.Details).From(form.Details); err != nil {
+		if err := deepcopier.Copy(details).From(form.Details); err != nil {
 			return err
 		}
 
-		model.Details.Keywords = strings.Join(txt.UniqueWords(txt.Words(model.Details.Keywords)), ", ")
+		details.Keywords = strings.Join(txt.UniqueWords(txt.Words(details.Keywords)), ", ")
 	}
 
-	if locChanged && model.LocSrc == SrcManual {
+	if locChanged && model.PlaceSrc == SrcManual {
 		locKeywords, labels := model.UpdateLocation(geoApi)
 
 		model.AddLabels(labels)
 
-		w := txt.UniqueWords(txt.Words(model.Details.Keywords))
+		w := txt.UniqueWords(txt.Words(details.Keywords))
 		w = append(w, locKeywords...)
 
-		model.Details.Keywords = strings.Join(txt.UniqueWords(w), ", ")
+		details.Keywords = strings.Join(txt.UniqueWords(w), ", ")
 	}
 
 	if err := model.SyncKeywordLabels(); err != nil {
@@ -135,18 +145,18 @@ func SavePhotoForm(model Photo, form form.Photo, geoApi string) error {
 	}
 
 	if err := model.UpdateTitle(model.ClassifyLabels()); err != nil {
-		log.Warn(err)
+		log.Info(err)
 	}
 
 	if err := model.IndexKeywords(); err != nil {
 		log.Errorf("photo: %s", err.Error())
 	}
 
-	edited := time.Now().UTC()
+	edited := Timestamp()
 	model.EditedAt = &edited
 	model.PhotoQuality = model.QualityScore()
 
-	if err := UnscopedDb().Save(&model).Error; err != nil {
+	if err := model.Save(); err != nil {
 		return err
 	}
 
@@ -166,31 +176,103 @@ func (m *Photo) String() string {
 			return txt.Quote(m.OriginalName)
 		}
 
-		return "[unknown photo]"
+		return "(unknown)"
 	}
 
 	return "uid " + txt.Quote(m.PhotoUID)
 }
 
-// Save the entity in the database.
+// FirstOrCreate fetches an existing row from the database or inserts a new one.
+func (m *Photo) FirstOrCreate() error {
+	if err := m.Create(); err == nil {
+		return nil
+	} else if err := m.Find(); err != nil {
+		return fmt.Errorf("photo: %s (first or create %s)", err, m.String())
+	}
+
+	return nil
+}
+
+// Create inserts a new photo to the database.
+func (m *Photo) Create() error {
+	if err := UnscopedDb().Create(m).Error; err != nil {
+		return err
+	}
+
+	if err := m.SaveDetails(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Save updates an existing photo or inserts a new one.
 func (m *Photo) Save() error {
+	if err := UnscopedDb().Save(m).Error; err == nil {
+		// Nothing to do.
+	} else if !strings.Contains(strings.ToLower(err.Error()), "lock") {
+		log.Errorf("photo: %s (save %s)", err, m.PhotoUID)
+		return err
+	} else if err := UnscopedDb().Save(m).Error; err != nil {
+		log.Errorf("photo: %s (save %s after deadlock)", err, m.PhotoUID)
+		return err
+	}
+
+	if err := m.SaveDetails(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Find returns a photo from the database.
+func (m *Photo) Find() error {
+	if m.PhotoUID == "" && m.ID == 0 {
+		return fmt.Errorf("photo: id and uid must not be empty (find)")
+	}
+
+	q := UnscopedDb().
+		Preload("Labels", func(db *gorm.DB) *gorm.DB {
+			return db.Order("photos_labels.uncertainty ASC, photos_labels.label_id DESC")
+		}).
+		Preload("Labels.Label").
+		Preload("Camera").
+		Preload("Lens").
+		Preload("Details").
+		Preload("Place").
+		Preload("Cell").
+		Preload("Cell.Place")
+
+	if rnd.IsPPID(m.PhotoUID, 'p') {
+		if err := q.First(m, "photo_uid = ?", m.PhotoUID).Error; err != nil {
+			return err
+		}
+	} else if err := q.First(m, "id = ?", m.ID).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Save the photo to the database.
+func (m *Photo) SaveLabels() error {
 	if !m.HasID() {
 		return errors.New("photo: can't save to database, id is empty")
 	}
 
 	labels := m.ClassifyLabels()
 
-	m.UpdateYearMonth()
+	m.UpdateDateFields()
 
 	if err := m.UpdateTitle(labels); err != nil {
-		log.Warn(err)
+		log.Info(err)
 	}
 
-	if m.DetailsLoaded() {
-		w := txt.UniqueWords(txt.Words(m.Details.Keywords))
-		w = append(w, labels.Keywords()...)
-		m.Details.Keywords = strings.Join(txt.UniqueWords(w), ", ")
-	}
+	details := m.GetDetails()
+
+	w := txt.UniqueWords(txt.Words(details.Keywords))
+	w = append(w, labels.Keywords()...)
+	details.Keywords = strings.Join(txt.UniqueWords(w), ", ")
 
 	if err := m.IndexKeywords(); err != nil {
 		log.Errorf("photo: %s", err.Error())
@@ -198,7 +280,7 @@ func (m *Photo) Save() error {
 
 	m.PhotoQuality = m.QualityScore()
 
-	if err := UnscopedDb().Save(m).Error; err != nil {
+	if err := m.Save(); err != nil {
 		return err
 	}
 
@@ -228,7 +310,7 @@ func (m *Photo) ClassifyLabels() classify.Labels {
 // BeforeCreate creates a random UID if needed before inserting a new row to the database.
 func (m *Photo) BeforeCreate(scope *gorm.Scope) error {
 	if m.TakenAt.IsZero() || m.TakenAtLocal.IsZero() {
-		now := time.Now()
+		now := Timestamp()
 
 		if err := scope.SetColumn("TakenAt", now); err != nil {
 			return err
@@ -249,7 +331,7 @@ func (m *Photo) BeforeCreate(scope *gorm.Scope) error {
 // BeforeSave ensures the existence of TakenAt properties before indexing or updating a photo
 func (m *Photo) BeforeSave(scope *gorm.Scope) error {
 	if m.TakenAt.IsZero() || m.TakenAtLocal.IsZero() {
-		now := time.Now()
+		now := Timestamp()
 
 		if err := scope.SetColumn("TakenAt", now); err != nil {
 			return err
@@ -265,20 +347,18 @@ func (m *Photo) BeforeSave(scope *gorm.Scope) error {
 
 // RemoveKeyword removes a word from photo keywords.
 func (m *Photo) RemoveKeyword(w string) error {
-	if !m.DetailsLoaded() {
-		return fmt.Errorf("can't remove keyword, details not loaded")
-	}
+	details := m.GetDetails()
 
-	words := txt.RemoveFromWords(txt.Words(m.Details.Keywords), w)
-
-	m.Details.Keywords = strings.Join(words, ", ")
+	words := txt.RemoveFromWords(txt.Words(details.Keywords), w)
+	details.Keywords = strings.Join(words, ", ")
 
 	return nil
 }
 
 // SyncKeywordLabels maintains the label / photo relationship for existing labels and keywords.
 func (m *Photo) SyncKeywordLabels() error {
-	keywords := txt.UniqueKeywords(m.Details.Keywords)
+	details := m.GetDetails()
+	keywords := txt.UniqueKeywords(details.Keywords)
 
 	var labelIds []uint
 
@@ -298,11 +378,8 @@ func (m *Photo) SyncKeywordLabels() error {
 
 // IndexKeywords adds given keywords to the photo entry
 func (m *Photo) IndexKeywords() error {
-	if !m.DetailsLoaded() {
-		return fmt.Errorf("can't index keywords, details not loaded")
-	}
-
-	db := Db()
+	db := UnscopedDb()
+	details := m.GetDetails()
 
 	var keywordIds []uint
 	var keywords []string
@@ -310,9 +387,9 @@ func (m *Photo) IndexKeywords() error {
 	// Add title, description and other keywords
 	keywords = append(keywords, txt.Keywords(m.PhotoTitle)...)
 	keywords = append(keywords, txt.Keywords(m.PhotoDescription)...)
-	keywords = append(keywords, txt.Keywords(m.Details.Keywords)...)
-	keywords = append(keywords, txt.Keywords(m.Details.Subject)...)
-	keywords = append(keywords, txt.Keywords(m.Details.Artist)...)
+	keywords = append(keywords, txt.Keywords(details.Keywords)...)
+	keywords = append(keywords, txt.Keywords(details.Subject)...)
+	keywords = append(keywords, txt.Keywords(details.Artist)...)
 
 	keywords = txt.UniqueWords(keywords)
 
@@ -396,7 +473,7 @@ func (m *Photo) HasID() bool {
 
 // UnknownLocation checks if the photo has an unknown location.
 func (m *Photo) UnknownLocation() bool {
-	return m.LocationID == "" || m.LocationID == UnknownLocation.ID
+	return m.CellID == "" || m.CellID == UnknownLocation.ID
 }
 
 // HasLocation checks if the photo has a known location.
@@ -406,15 +483,15 @@ func (m *Photo) HasLocation() bool {
 
 // LocationLoaded checks if the photo has a known location that is currently loaded.
 func (m *Photo) LocationLoaded() bool {
-	if m.Location == nil {
+	if m.Cell == nil {
 		return false
 	}
 
-	if m.Location.Place == nil {
+	if m.Cell.Place == nil {
 		return false
 	}
 
-	return !m.Location.Unknown() && m.Location.ID == m.LocationID
+	return !m.Cell.Unknown() && m.Cell.ID == m.CellID
 }
 
 // LoadLocation loads the photo location from the database if not done already.
@@ -427,9 +504,9 @@ func (m *Photo) LoadLocation() error {
 		return fmt.Errorf("photo: unknown location (%s)", m)
 	}
 
-	var location Location
+	var location Cell
 
-	err := Db().Preload("Place").First(&location, "id = ?", m.LocationID).Error
+	err := Db().Preload("Place").First(&location, "id = ?", m.CellID).Error
 
 	if err != nil {
 		return err
@@ -440,7 +517,7 @@ func (m *Photo) LoadLocation() error {
 		location.PlaceID = UnknownPlace.ID
 	}
 
-	m.Location = &location
+	m.Cell = &location
 
 	return nil
 }
@@ -527,29 +604,56 @@ func (m *Photo) HasDescription() bool {
 	return m.PhotoDescription != ""
 }
 
-// DetailsLoaded returns true if photo details exist.
-func (m *Photo) DetailsLoaded() bool {
-	return m.Details.PhotoID == m.ID
+// GetDetails returns the photo description details.
+func (m *Photo) GetDetails() *Details {
+	if m.Details != nil {
+		m.Details.PhotoID = m.ID
+		return m.Details
+	} else if !m.HasID() {
+		m.Details = &Details{}
+		return m.Details
+	}
+
+	m.Details = &Details{PhotoID: m.ID}
+
+	if details := FirstOrCreateDetails(m.Details); details != nil {
+		m.Details = details
+	}
+
+	return m.Details
 }
 
-// TitleFromFileName returns a photo title based on the file name and/or path.
-func (m *Photo) TitleFromFileName() string {
-	if fs.NonCanonical(m.PhotoName) {
-		if title := txt.TitleFromFileName(m.PhotoName); title != "" {
+// SaveDetails writes photo details to the database.
+func (m *Photo) SaveDetails() error {
+	if err := m.GetDetails().Save(); err == nil {
+		return nil
+	} else if details := FirstOrCreateDetails(m.GetDetails()); details != nil {
+		m.Details = details
+		return nil
+	} else {
+		log.Errorf("photo: %s (save details for %d)", err, m.ID)
+		return err
+	}
+}
+
+// FileTitle returns a photo title based on the file name and/or path.
+func (m *Photo) FileTitle() string {
+	if !fs.IsGenerated(m.PhotoName) {
+		if title := txt.FileTitle(m.PhotoName); title != "" {
 			return title
 		}
 	}
 
-	if m.OriginalName != "" && fs.NonCanonical(m.OriginalName) {
-		if title := txt.TitleFromFileName(m.OriginalName); title != "" {
+	if m.OriginalName != "" && !fs.IsGenerated(m.OriginalName) {
+		if title := txt.FileTitle(m.OriginalName); title != "" {
 			return title
-		} else if title := txt.TitleFromFileName(path.Dir(m.OriginalName)); title != "" {
+		} else if title := txt.FileTitle(path.Dir(m.OriginalName)); title != "" {
 			return title
 		}
 	}
 
 	if m.PhotoPath != "" {
-		return txt.TitleFromFileName(m.PhotoPath)
+		return txt.FileTitle(m.PhotoPath)
 	}
 
 	return ""
@@ -564,15 +668,15 @@ func (m *Photo) UpdateTitle(labels classify.Labels) error {
 	var knownLocation bool
 
 	oldTitle := m.PhotoTitle
-	fileTitle := m.TitleFromFileName()
+	fileTitle := m.FileTitle()
 
 	if m.LocationLoaded() {
 		knownLocation = true
-		loc := m.Location
+		loc := m.Cell
 
 		// TODO: User defined title format
 		if title := labels.Title(loc.Name()); title != "" {
-			log.Infof("photo: using label %s to create title for %s", txt.Quote(title), m.PhotoUID)
+			log.Debugf("photo: using label %s to create title for %s", txt.Quote(title), m.PhotoUID)
 			if loc.NoCity() || loc.LongCity() || loc.CityContains(title) {
 				m.SetTitle(fmt.Sprintf("%s / %s / %s", txt.Title(title), loc.CountryName(), m.TakenAt.Format("2006")), SrcAuto)
 			} else {
@@ -597,7 +701,7 @@ func (m *Photo) UpdateTitle(labels classify.Labels) error {
 		knownLocation = true
 
 		if title := labels.Title(fileTitle); title != "" {
-			log.Infof("photo: using label %s to create title for %s", txt.Quote(title), m.PhotoUID)
+			log.Debugf("photo: using label %s to create title for %s", txt.Quote(title), m.PhotoUID)
 			if m.Place.NoCity() || m.Place.LongCity() || m.Place.CityContains(title) {
 				m.SetTitle(fmt.Sprintf("%s / %s / %s", txt.Title(title), m.Place.CountryName(), m.TakenAt.Format("2006")), SrcAuto)
 			} else {
@@ -613,25 +717,27 @@ func (m *Photo) UpdateTitle(labels classify.Labels) error {
 	}
 
 	if !knownLocation || m.NoTitle() {
-		if fileTitle == "" {
-			fileTitle = TitleUnknown
-		}
-
-		if len(labels) > 0 && labels[0].Priority >= -1 && labels[0].Uncertainty <= 85 && labels[0].Name != "" {
+		if fileTitle == "" && len(labels) > 0 && labels[0].Priority >= -1 && labels[0].Uncertainty <= 85 && labels[0].Name != "" {
 			if m.TakenSrc != SrcAuto {
 				m.SetTitle(fmt.Sprintf("%s / %s", txt.Title(labels[0].Name), m.TakenAt.Format("2006")), SrcAuto)
 			} else {
 				m.SetTitle(txt.Title(labels[0].Name), SrcAuto)
 			}
-		} else if len(fileTitle) <= 20 && !m.TakenAtLocal.IsZero() && m.TakenSrc != SrcAuto {
+		} else if fileTitle != "" && len(fileTitle) <= 20 && !m.TakenAtLocal.IsZero() && m.TakenSrc != SrcAuto {
 			m.SetTitle(fmt.Sprintf("%s / %s", fileTitle, m.TakenAtLocal.Format("2006")), SrcAuto)
-		} else {
+		} else if fileTitle != "" {
 			m.SetTitle(fileTitle, SrcAuto)
+		} else {
+			if m.TakenSrc != SrcAuto {
+				m.SetTitle(fmt.Sprintf("%s / %s", TitleUnknown, m.TakenAt.Format("2006")), SrcAuto)
+			} else {
+				m.SetTitle(TitleUnknown, SrcAuto)
+			}
 		}
 	}
 
 	if m.PhotoTitle != oldTitle {
-		log.Infof("photo: changed title of %s to %s", m.PhotoUID, txt.Quote(m.PhotoTitle))
+		log.Debugf("photo: changed title of %s to %s", m.PhotoUID, txt.Quote(m.PhotoTitle))
 	}
 
 	return nil
@@ -731,11 +837,11 @@ func (m *Photo) SetTakenAt(taken, local time.Time, zone, source string) {
 		m.TimeZone = zone
 	}
 
-	m.UpdateYearMonth()
+	m.UpdateDateFields()
 }
 
-// UpdateYearMonth updates internal date fields.
-func (m *Photo) UpdateYearMonth() {
+// UpdateDateFields updates internal date fields.
+func (m *Photo) UpdateDateFields() {
 	if m.TakenAt.IsZero() || m.TakenAt.Year() < 1000 {
 		return
 	}
@@ -747,9 +853,11 @@ func (m *Photo) UpdateYearMonth() {
 	if m.TakenSrc == SrcAuto {
 		m.PhotoYear = YearUnknown
 		m.PhotoMonth = MonthUnknown
-	} else {
+		m.PhotoDay = DayUnknown
+	} else if m.TakenSrc != SrcManual {
 		m.PhotoYear = m.TakenAtLocal.Year()
 		m.PhotoMonth = int(m.TakenAtLocal.Month())
+		m.PhotoDay = m.TakenAtLocal.Day()
 	}
 }
 
@@ -759,14 +867,14 @@ func (m *Photo) SetCoordinates(lat, lng float32, altitude int, source string) {
 		return
 	}
 
-	if m.LocSrc != SrcAuto && m.LocSrc != source && source != SrcManual {
+	if m.PlaceSrc != SrcAuto && m.PlaceSrc != source && source != SrcManual {
 		return
 	}
 
 	m.PhotoLat = lat
 	m.PhotoLng = lng
 	m.PhotoAltitude = altitude
-	m.LocSrc = source
+	m.PlaceSrc = source
 }
 
 // AllFilesMissing returns true, if all files for this photo are missing.
@@ -796,6 +904,7 @@ func (m *Photo) Delete(permanently bool) error {
 // Delete permanently deletes the entity from the database.
 func (m *Photo) DeletePermanently() error {
 	Db().Unscoped().Delete(File{}, "photo_id = ?", m.ID)
+	Db().Unscoped().Delete(Details{}, "photo_id = ?", m.ID)
 	Db().Unscoped().Delete(PhotoKeyword{}, "photo_id = ?", m.ID)
 	Db().Unscoped().Delete(PhotoLabel{}, "photo_id = ?", m.ID)
 	Db().Unscoped().Delete(PhotoAlbum{}, "photo_uid = ?", m.PhotoUID)
@@ -842,4 +951,40 @@ func (m *Photo) SetFavorite(favorite bool) error {
 	}
 
 	return nil
+}
+
+// Approve approves a photo in review.
+func (m *Photo) Approve() error {
+	if m.PhotoQuality >= 3 {
+		// Nothing to do.
+		return nil
+	}
+
+	edited := Timestamp()
+	m.EditedAt = &edited
+	m.PhotoQuality = m.QualityScore()
+
+	if err := Db().Model(m).Updates(Photo{EditedAt: m.EditedAt, PhotoQuality: m.PhotoQuality}).Error; err != nil {
+		return err
+	}
+
+	if err := UpdatePhotoCounts(); err != nil {
+		log.Errorf("photo: %s", err)
+	}
+
+	event.Publish("count.review", event.Data{
+		"count": -1,
+	})
+
+	return nil
+}
+
+// Links returns all share links for this entity.
+func (m *Photo) Links() Links {
+	return FindLinks("", m.PhotoUID)
+}
+
+// PrimaryFile returns the primary file for this photo.
+func (m *Photo) PrimaryFile() (File, error) {
+	return PrimaryFile(m.PhotoUID)
 }

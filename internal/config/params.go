@@ -32,6 +32,7 @@ type Params struct {
 	Version            string
 	Copyright          string
 	SiteUrl            string `yaml:"site-url" flag:"site-url"`
+	SitePreview        string `yaml:"site-preview" flag:"site-preview"`
 	SiteTitle          string `yaml:"site-title" flag:"site-title"`
 	SiteCaption        string `yaml:"site-caption" flag:"site-caption"`
 	SiteDescription    string `yaml:"site-description" flag:"site-description"`
@@ -44,7 +45,6 @@ type Params struct {
 	Workers            int    `yaml:"workers" flag:"workers"`
 	WakeupInterval     int    `yaml:"wakeup-interval" flag:"wakeup-interval"`
 	AdminPassword      string `yaml:"admin-password" flag:"admin-password"`
-	WebDAVPassword     string `yaml:"webdav-password" flag:"webdav-password"`
 	LogLevel           string `yaml:"log-level" flag:"log-level"`
 	AssetsPath         string `yaml:"assets-path" flag:"assets-path"`
 	StoragePath        string `yaml:"storage-path" flag:"storage-path"`
@@ -59,12 +59,14 @@ type Params struct {
 	DatabaseDriver     string `yaml:"database-driver" flag:"database-driver"`
 	DatabaseDsn        string `yaml:"database-dsn" flag:"database-dsn"`
 	DatabaseConns      int    `yaml:"database-conns" flag:"database-conns"`
+	DatabaseConnsIdle  int    `yaml:"database-conns-idle" flag:"database-conns-idle"`
 	HttpServerHost     string `yaml:"http-host" flag:"http-host"`
 	HttpServerPort     int    `yaml:"http-port" flag:"http-port"`
 	HttpServerMode     string `yaml:"http-mode" flag:"http-mode"`
 	HttpServerPassword string `yaml:"http-password" flag:"http-password"`
 	SipsBin            string `yaml:"sips-bin" flag:"sips-bin"`
 	DarktableBin       string `yaml:"darktable-bin" flag:"darktable-bin"`
+	DarktableUnlock    bool   `yaml:"darktable-unlock" flag:"darktable-unlock"`
 	HeifConvertBin     string `yaml:"heifconvert-bin" flag:"heifconvert-bin"`
 	FFmpegBin          string `yaml:"ffmpeg-bin" flag:"ffmpeg-bin"`
 	ExifToolBin        string `yaml:"exiftool-bin" flag:"exiftool-bin"`
@@ -82,7 +84,8 @@ type Params struct {
 	ThumbFilter        string `yaml:"thumb-filter" flag:"thumb-filter"`
 	ThumbUncached      bool   `yaml:"thumb-uncached" flag:"thumb-uncached"`
 	ThumbSize          int    `yaml:"thumb-size" flag:"thumb-size"`
-	ThumbLimit         int    `yaml:"thumb-limit" flag:"thumb-limit"`
+	ThumbSizeUncached  int    `yaml:"thumb-size-uncached" flag:"thumb-size-uncached"`
+	JpegSize           int    `yaml:"jpeg-size" flag:"jpeg-size"`
 	JpegQuality        int    `yaml:"jpeg-quality" flag:"jpeg-quality"`
 }
 
